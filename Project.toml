@@ -1,0 +1,36 @@
+name = "MichiBoost"
+uuid = "d4c3b8e2-7f5a-4b1e-9c6d-a2f8e3b0c1d4"
+authors = ["Jose Esparza <joseesparzadc@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+
+[compat]
+Aqua = "0.8"
+BenchmarkTools = "1"
+CategoricalArrays = "0.10, 1"
+CondaPkg = "0.2"
+DataFrames = "1.6"
+PythonCall = "0.9"
+Random = "<0.0.1, 1"
+Serialization = "<0.0.1, 1"
+Statistics = "<0.0.1, 1"
+Tables = "1.10"
+Test = "<0.0.1, 1"
+julia = "1.10"
+
+[extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Aqua", "DataFrames", "Test"]

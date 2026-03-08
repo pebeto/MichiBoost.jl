@@ -1,0 +1,5 @@
+# Only needed for running test/benchmark_vs_catboost.jl
+# The MichiBoost package itself has zero Python dependencies.
+[deps]
+catboost = ">=1.2.8"
+numpy = ""
