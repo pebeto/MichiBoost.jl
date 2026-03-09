@@ -1,7 +1,11 @@
 abstract type LossFunction end
-struct RMSELoss     <: LossFunction end
-struct MAELoss      <: LossFunction end
-struct LoglossLoss  <: LossFunction end
+
+struct RMSELoss <: LossFunction end
+
+struct MAELoss <: LossFunction end
+
+struct LoglossLoss <: LossFunction end
+
 struct MultiClassLoss <: LossFunction
     n_classes::Int
 end

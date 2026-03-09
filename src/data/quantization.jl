@@ -1,7 +1,12 @@
 function quantize_features(numerical_data::Matrix{Float64}; border_count::Int=254)
     n_samples, n_features = size(numerical_data)
-    n_features == 0 && return QuantizedFeatures(
-        Matrix{UInt16}(undef, n_samples, 0), Vector{Float64}[], Int[])
+    if n_features == 0
+        return QuantizedFeatures(
+            Matrix{UInt16}(undef, n_samples, 0),
+            Vector{Float64}[],
+            Int[],
+        )
+    end
 
     borders = Vector{Vector{Float64}}(undef, n_features)
     bins = Matrix{UInt16}(undef, n_samples, n_features)
@@ -33,7 +38,9 @@ function _compute_borders(values::AbstractVector{Float64}, border_count::Int)
     isempty(valid) && return Float64[]
     sorted = sort(valid)
     n = length(sorted)
-    n <= 1 && return Float64[]
+    if n <= 1
+        return Float64[]
+    end
 
     n_borders = min(border_count, n - 1)
     borders = Float64[]
@@ -48,11 +55,17 @@ function _compute_borders(values::AbstractVector{Float64}, border_count::Int)
 end
 
 function _assign_bin(value::Float64, borders::Vector{Float64})
-    isnan(value) && return UInt16(0)
+    if isnan(value)
+        return UInt16(0)
+    end
     lo, hi = 1, length(borders)
     while lo <= hi
         mid = (lo + hi) >> 1
-        value <= borders[mid] ? (hi = mid - 1) : (lo = mid + 1)
+        if value <= borders[mid]
+            hi = mid - 1
+        else
+            lo = mid + 1
+        end
     end
     return UInt16(lo)
 end

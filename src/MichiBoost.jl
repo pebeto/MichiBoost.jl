@@ -1,7 +1,7 @@
 module MichiBoost
 
 using CategoricalArrays: CategoricalValue, unwrap
-using Random: Random, randperm, MersenneTwister
+using Random: MersenneTwister, Random, randperm
 using Serialization: Serialization
 using Statistics: mean, median
 using Tables: Tables
@@ -29,11 +29,13 @@ include("io.jl")
 # User-facing API
 include("api.jl")
 
-export MichiBoostRegressor, MichiBoostClassifier
-export fit!, predict, predict_proba, predict_classes
-export Pool, slice
-export feature_importance
-export save_model, load_model
+export MichiBoostClassifier, MichiBoostRegressor
+export Pool
 export cv
+export feature_importance
+export fit!
+export load_model, save_model
+export predict, predict_classes, predict_proba
+export slice
 
 end # module

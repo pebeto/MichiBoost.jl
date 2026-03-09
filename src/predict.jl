@@ -1,11 +1,15 @@
 function _prepare_features(model::MichiBoostModel, pool::Pool)
     n = pool.n_samples
-    num_bins = n_numerical(pool) > 0 ?
-               apply_borders(pool.features_numerical, model.borders) :
-               Matrix{UInt16}(undef, n, 0)
-    cat_encoded = n_categorical(pool) > 0 && model.encoder !== nothing ?
-                  encode_categorical(model.encoder, pool.features_categorical) :
-                  Matrix{Float64}(undef, n, 0)
+    num_bins = if n_numerical(pool) > 0
+        apply_borders(pool.features_numerical, model.borders)
+    else
+        Matrix{UInt16}(undef, n, 0)
+    end
+    cat_encoded = if n_categorical(pool) > 0 && model.encoder !== nothing
+        encode_categorical(model.encoder, pool.features_categorical)
+    else
+        Matrix{Float64}(undef, n, 0)
+    end
     return num_bins, cat_encoded
 end
 
@@ -53,10 +57,12 @@ function predict_classes(model::MichiBoostModel, pool::Pool)
     if model.is_multiclass
         return [model.class_labels[argmax(preds[i, :])] for i in axes(preds, 1)]
     elseif model.n_classes == 2
-        return [preds[i] >= 0.5 ? model.class_labels[2] : model.class_labels[1]
-                for i in eachindex(preds)]
+        return [
+            preds[i] >= 0.5 ? model.class_labels[2] : model.class_labels[1] for
+            i in eachindex(preds)
+        ]
     else
-        error("predict_classes is only for classification models")
+        return error("predict_classes is only for classification models")
     end
 end
 
@@ -70,19 +76,27 @@ to 100.  Features never used in any split get 0.
 """
 function feature_importance(model::MichiBoostModel)
     n_num = length(model.borders)
-    n_cat = model.encoder !== nothing ? length(model.encoder.category_stats) : 0
+    n_cat = if model.encoder !== nothing
+        length(model.encoder.category_stats)
+    else
+        0
+    end
     importance = Dict{Int,Float64}()
 
     for tree in model.trees, k in 1:tree.depth
-        idx = tree.split_feature_types[k] == :numerical ?
-              tree.split_feature_indices[k] :
-              n_num + tree.split_feature_indices[k]
+        idx = if tree.split_feature_types[k] == :numerical
+            tree.split_feature_indices[k]
+        else
+            n_num + tree.split_feature_indices[k]
+        end
         importance[idx] = get(importance, idx, 0.0) + 1.0
     end
 
     total = max(sum(values(importance); init=0.0), 1e-10)
-    names = vcat([Symbol("num_$i") for i in 1:n_num],
-                 [Symbol("cat_$i") for i in 1:n_cat])
+    names = vcat(
+        [Symbol("num_$i") for i in 1:n_num],
+        [Symbol("cat_$i") for i in 1:n_cat],
+    )
 
     result = Pair{Symbol,Float64}[]
     for (idx, imp) in sort(collect(importance); by=x -> -x[2])

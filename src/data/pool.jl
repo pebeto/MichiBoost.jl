@@ -28,20 +28,55 @@ pool = Pool((color=["red","blue","red"], size=[1.0, 2.0, 3.0]);
             label=[0.0, 1.0, 0.0])
 ```
 """
-function Pool(data; label=nothing, cat_features=nothing, text_features=nothing,
-              feature_names=nothing, weight=nothing, group_id=nothing)
-    return _build_pool(data; label, cat_features, text_features, feature_names, weight,
-                       group_id)
+function Pool(
+    data;
+    label=nothing,
+    cat_features=nothing,
+    text_features=nothing,
+    feature_names=nothing,
+    weight=nothing,
+    group_id=nothing,
+)
+    return _build_pool(
+        data;
+        label,
+        cat_features,
+        text_features,
+        feature_names,
+        weight,
+        group_id,
+    )
 end
 
-function Pool(; data, label=nothing, cat_features=nothing, text_features=nothing,
-              feature_names=nothing, weight=nothing, group_id=nothing)
-    return _build_pool(data; label, cat_features, text_features, feature_names, weight,
-                       group_id)
+function Pool(;
+    data,
+    label=nothing,
+    cat_features=nothing,
+    text_features=nothing,
+    feature_names=nothing,
+    weight=nothing,
+    group_id=nothing,
+)
+    return _build_pool(
+        data;
+        label,
+        cat_features,
+        text_features,
+        feature_names,
+        weight,
+        group_id,
+    )
 end
 
-function _build_pool(data; label=nothing, cat_features=nothing, text_features=nothing,
-                     feature_names=nothing, weight=nothing, group_id=nothing)
+function _build_pool(
+    data;
+    label=nothing,
+    cat_features=nothing,
+    text_features=nothing,
+    feature_names=nothing,
+    weight=nothing,
+    group_id=nothing,
+)
     if Tables.istable(data)
         ct = Tables.columntable(data)
         col_names = collect(Tables.columnnames(ct))
@@ -99,27 +134,45 @@ function _build_pool(data; label=nothing, cat_features=nothing, text_features=no
     processed_label, label_mapping, label_classes = if label !== nothing
         _process_label_full(label)
     else
-        nothing, nothing, nothing
+        (nothing, nothing, nothing)
     end
 
-    processed_weight = weight !== nothing ? Float64.(weight) : nothing
+    processed_weight = if weight !== nothing
+        Float64.(weight)
+    else
+        nothing
+    end
 
-    return Pool(features_numerical, features_categorical, cat_mapping,
-                processed_label, label_mapping, label_classes, fnames,
-                num_indices, cat_indices, n_samples, n_total_features,
-                processed_weight, group_id)
+    return Pool(
+        features_numerical,
+        features_categorical,
+        cat_mapping,
+        processed_label,
+        label_mapping,
+        label_classes,
+        fnames,
+        num_indices,
+        cat_indices,
+        n_samples,
+        n_total_features,
+        processed_weight,
+        group_id,
+    )
 end
 
 function _collect_cat_indices!(set, features, fnames)
-    features === nothing && return
+    features === nothing && return nothing
     for cf in features
         if cf isa Integer
             push!(set, cf + 1)
         elseif cf isa Symbol || cf isa AbstractString
             idx = findfirst(==(Symbol(cf)), fnames)
-            idx !== nothing && push!(set, idx)
+            if idx !== nothing
+                push!(set, idx)
+            end
         end
     end
+    return nothing
 end
 
 _to_float(x::Real) = Float64(x)
@@ -140,7 +193,8 @@ function _process_label_full(label)
     return [label_map[v] for v in unwrapped], label_map, unique_vals
 end
 
-n_numerical(pool::Pool)  = size(pool.features_numerical, 2)
+n_numerical(pool::Pool) = size(pool.features_numerical, 2)
+
 n_categorical(pool::Pool) = length(pool.features_categorical)
 
 function get_label(pool::Pool)

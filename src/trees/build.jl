@@ -1,23 +1,42 @@
-function build_symmetric_tree(gradients::AbstractVector{Float64},
-                              hessians::AbstractVector{Float64},
-                              num_bins::AbstractMatrix{UInt16},
-                              cat_encoded::AbstractMatrix{Float64},
-                              sample_indices::Vector{Int},
-                              depth::Int,
-                              n_num::Int,
-                              n_cat::Int,
-                              qf::QuantizedFeatures;
-                              l2_leaf_reg::Float64=3.0,
-                              min_data_in_leaf::Int=1)
+function build_symmetric_tree(
+    gradients::AbstractVector{Float64},
+    hessians::AbstractVector{Float64},
+    num_bins::AbstractMatrix{UInt16},
+    cat_encoded::AbstractMatrix{Float64},
+    sample_indices::Vector{Int},
+    depth::Int,
+    n_num::Int,
+    n_cat::Int,
+    qf::QuantizedFeatures;
+    l2_leaf_reg::Float64=3.0,
+    min_data_in_leaf::Int=1,
+)
     split_features, split_types, split_thresholds = Int[], Symbol[], Float64[]
     leaf_groups = [sample_indices]
 
     for _ in 1:depth
         best = _find_best_split_across_leaves(
-            gradients, hessians, num_bins, cat_encoded,
-            leaf_groups, n_num, n_cat, qf; l2_leaf_reg, min_data_in_leaf)
-        leaf_groups = _apply_split!(split_features, split_types, split_thresholds,
-                                    leaf_groups, best, num_bins, cat_encoded, n_num)
+            gradients,
+            hessians,
+            num_bins,
+            cat_encoded,
+            leaf_groups,
+            n_num,
+            n_cat,
+            qf;
+            l2_leaf_reg,
+            min_data_in_leaf,
+        )
+        leaf_groups = _apply_split!(
+            split_features,
+            split_types,
+            split_thresholds,
+            leaf_groups,
+            best,
+            num_bins,
+            cat_encoded,
+            n_num,
+        )
     end
 
     n_leaves = 1 << depth
@@ -28,7 +47,10 @@ function build_symmetric_tree(gradients::AbstractVector{Float64},
             leaf_values[l] = 0.0
         else
             g_sum, h_sum = 0.0, 0.0
-            for idx in group; g_sum += gradients[idx]; h_sum += hessians[idx]; end
+            for idx in group
+                g_sum += gradients[idx]
+                h_sum += hessians[idx]
+            end
             leaf_values[l] = g_sum / (h_sum + l2_leaf_reg)
         end
     end
@@ -36,27 +58,47 @@ function build_symmetric_tree(gradients::AbstractVector{Float64},
     return SymmetricTree(depth, split_features, split_types, split_thresholds, leaf_values)
 end
 
-function build_symmetric_tree_multiclass(gradients::AbstractMatrix{Float64},
-                                         hessians::AbstractMatrix{Float64},
-                                         num_bins::AbstractMatrix{UInt16},
-                                         cat_encoded::AbstractMatrix{Float64},
-                                         sample_indices::Vector{Int},
-                                         depth::Int,
-                                         n_num::Int,
-                                         n_cat::Int,
-                                         qf::QuantizedFeatures,
-                                         n_classes::Int;
-                                         l2_leaf_reg::Float64=3.0,
-                                         min_data_in_leaf::Int=1)
+function build_symmetric_tree_multiclass(
+    gradients::AbstractMatrix{Float64},
+    hessians::AbstractMatrix{Float64},
+    num_bins::AbstractMatrix{UInt16},
+    cat_encoded::AbstractMatrix{Float64},
+    sample_indices::Vector{Int},
+    depth::Int,
+    n_num::Int,
+    n_cat::Int,
+    qf::QuantizedFeatures,
+    n_classes::Int;
+    l2_leaf_reg::Float64=3.0,
+    min_data_in_leaf::Int=1,
+)
     split_features, split_types, split_thresholds = Int[], Symbol[], Float64[]
     leaf_groups = [sample_indices]
 
     for _ in 1:depth
         best = _find_best_split_across_leaves_mc(
-            gradients, hessians, num_bins, cat_encoded,
-            leaf_groups, n_num, n_cat, qf, n_classes; l2_leaf_reg, min_data_in_leaf)
-        leaf_groups = _apply_split!(split_features, split_types, split_thresholds,
-                                    leaf_groups, best, num_bins, cat_encoded, n_num)
+            gradients,
+            hessians,
+            num_bins,
+            cat_encoded,
+            leaf_groups,
+            n_num,
+            n_cat,
+            qf,
+            n_classes;
+            l2_leaf_reg,
+            min_data_in_leaf,
+        )
+        leaf_groups = _apply_split!(
+            split_features,
+            split_types,
+            split_thresholds,
+            leaf_groups,
+            best,
+            num_bins,
+            cat_encoded,
+            n_num,
+        )
     end
 
     n_leaves = 1 << depth
@@ -68,25 +110,42 @@ function build_symmetric_tree_multiclass(gradients::AbstractMatrix{Float64},
         else
             for c in 1:n_classes
                 g_sum, h_sum = 0.0, 0.0
-                for idx in group; g_sum += gradients[idx, c]; h_sum += hessians[idx, c]; end
+                for idx in group
+                    g_sum += gradients[idx, c]
+                    h_sum += hessians[idx, c]
+                end
                 leaf_values[l, c] = g_sum / (h_sum + l2_leaf_reg)
             end
         end
     end
 
-    return SymmetricTreeMultiClass(depth, split_features, split_types, split_thresholds,
-                                   leaf_values)
+    return SymmetricTreeMultiClass(
+        depth,
+        split_features,
+        split_types,
+        split_thresholds,
+        leaf_values,
+    )
 end
 
-function _apply_split!(split_features, split_types, split_thresholds,
-                       leaf_groups, best::SplitCandidate, num_bins, cat_encoded, n_num)
+function _apply_split!(
+    split_features,
+    split_types,
+    split_thresholds,
+    leaf_groups,
+    best::SplitCandidate,
+    num_bins,
+    cat_encoded,
+    n_num,
+)
     if best.feature_index == 0
         push!(split_features, 1)
         push!(split_types, n_num > 0 ? :numerical : :categorical)
         push!(split_thresholds, 0.0)
         new_groups = Vector{Int}[]
         for group in leaf_groups
-            push!(new_groups, group); push!(new_groups, Int[])
+            push!(new_groups, group)
+            push!(new_groups, Int[])
         end
         return new_groups
     end
@@ -105,26 +164,40 @@ function _apply_split!(split_features, split_types, split_thresholds,
                 push!(left, idx)
             end
         end
-        push!(new_groups, left); push!(new_groups, right)
+        push!(new_groups, left)
+        push!(new_groups, right)
     end
     return new_groups
 end
 
 @inline function _goes_right(split::SplitCandidate, num_bins, cat_encoded, idx)
-    return split.feature_type == :numerical ?
-        num_bins[idx, split.feature_index] > UInt16(split.threshold) :
-        cat_encoded[idx, split.feature_index] > split.threshold
+    if split.feature_type == :numerical
+        return num_bins[idx, split.feature_index] > UInt16(split.threshold)
+    else
+        return cat_encoded[idx, split.feature_index] > split.threshold
+    end
 end
 
-function _find_best_split_across_leaves(gradients, hessians, num_bins, cat_encoded,
-                                         leaf_groups, n_num, n_cat, qf;
-                                         l2_leaf_reg=3.0, min_data_in_leaf=1)
+function _find_best_split_across_leaves(
+    gradients,
+    hessians,
+    num_bins,
+    cat_encoded,
+    leaf_groups,
+    n_num,
+    n_cat,
+    qf;
+    l2_leaf_reg=3.0,
+    min_data_in_leaf=1,
+)
     best = SplitCandidate(0, :numerical, 0.0, -Inf)
 
     # Numerical features — build per-leaf histograms, then sweep
     for j in 1:n_num
         nb = qf.n_bins[j]
-        nb <= 1 && continue
+        if nb <= 1
+            continue
+        end
 
         # Build one histogram per leaf
         leaf_hists_g = [zeros(Float64, nb + 1) for _ in leaf_groups]
@@ -160,12 +233,13 @@ function _find_best_split_across_leaves(gradients, hessians, num_bins, cat_encod
             end
 
             gain = 0.0
-            valid = true
             for li in eachindex(leaf_groups)
                 lc = left_c[li]
                 rc = leaf_total_n[li] - lc
                 # Skip leaves that are empty or too small to split
-                leaf_total_n[li] == 0 && continue
+                if leaf_total_n[li] == 0
+                    continue
+                end
                 if lc < min_data_in_leaf || rc < min_data_in_leaf
                     # This leaf can't be split at this threshold, but others might
                     # Just add 0 gain for this leaf (no improvement)
@@ -178,7 +252,9 @@ function _find_best_split_across_leaves(gradients, hessians, num_bins, cat_encod
                         leaf_total_g[li]^2 / (leaf_total_h[li] + l2_leaf_reg)
             end
 
-            gain > best.gain && (best = SplitCandidate(j, :numerical, Float64(b - 1), gain))
+            if gain > best.gain
+                best = SplitCandidate(j, :numerical, Float64(b - 1), gain)
+            end
         end
     end
 
@@ -189,28 +265,39 @@ function _find_best_split_across_leaves(gradients, hessians, num_bins, cat_encod
             push!(all_vals, cat_encoded[idx, j])
         end
         sorted_vals = sort(collect(all_vals))
-        length(sorted_vals) <= 1 && continue
+        if length(sorted_vals) <= 1
+            continue
+        end
 
         for s in 1:(length(sorted_vals) - 1)
             threshold = (sorted_vals[s] + sorted_vals[s + 1]) / 2.0
             gain = 0.0
             for group in leaf_groups
-                isempty(group) && continue
+                if isempty(group)
+                    continue
+                end
                 lg, lh, lc = 0.0, 0.0, 0
                 tg, th = 0.0, 0.0
                 for idx in group
-                    tg += gradients[idx]; th += hessians[idx]
+                    tg += gradients[idx]
+                    th += hessians[idx]
                     if cat_encoded[idx, j] <= threshold
-                        lg += gradients[idx]; lh += hessians[idx]; lc += 1
+                        lg += gradients[idx]
+                        lh += hessians[idx]
+                        lc += 1
                     end
                 end
                 rc = length(group) - lc
-                (lc < min_data_in_leaf || rc < min_data_in_leaf) && continue
+                if lc < min_data_in_leaf || rc < min_data_in_leaf
+                    continue
+                end
                 rg, rh = tg - lg, th - lh
                 gain += lg^2 / (lh + l2_leaf_reg) + rg^2 / (rh + l2_leaf_reg) -
                         tg^2 / (th + l2_leaf_reg)
             end
-            gain > best.gain && (best = SplitCandidate(j, :categorical, threshold, gain))
+            if gain > best.gain
+                best = SplitCandidate(j, :categorical, threshold, gain)
+            end
         end
     end
 

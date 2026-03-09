@@ -1,12 +1,18 @@
-function compute_ordered_target_stats(cat_features::Vector{Vector{UInt32}},
-                                      label::Vector{Float64},
-                                      permutation::Vector{Int};
-                                      alpha::Float64=1.0,
-                                      prior::Union{Float64,Nothing}=nothing)
+function compute_ordered_target_stats(
+    cat_features::Vector{Vector{UInt32}},
+    label::Vector{Float64},
+    permutation::Vector{Int};
+    alpha::Float64=1.0,
+    prior::Union{Float64,Nothing}=nothing,
+)
     n_samples = length(label)
     n_cat = length(cat_features)
-    n_cat == 0 && return (Matrix{Float64}(undef, n_samples, 0),
-                          OrderedTargetEncoder(0.0, alpha, Dict{UInt32,Tuple{Float64,Int}}[]))
+    if n_cat == 0
+        return (
+            Matrix{Float64}(undef, n_samples, 0),
+            OrderedTargetEncoder(0.0, alpha, Dict{UInt32,Tuple{Float64,Int}}[]),
+        )
+    end
 
     p = prior !== nothing ? prior : mean(label)
     encoded = Matrix{Float64}(undef, n_samples, n_cat)
@@ -49,9 +55,14 @@ function plain_target_encode(cat_features::Vector{Vector{UInt32}}, y::Vector{Flo
     return encoded, OrderedTargetEncoder(p, alpha, stats)
 end
 
-function encode_categorical(encoder::OrderedTargetEncoder, cat_features::Vector{Vector{UInt32}})
+function encode_categorical(
+    encoder::OrderedTargetEncoder,
+    cat_features::Vector{Vector{UInt32}},
+)
     n_cat = length(cat_features)
-    n_cat == 0 && return Matrix{Float64}(undef, length(first(cat_features)), 0)
+    if n_cat == 0
+        return Matrix{Float64}(undef, length(first(cat_features)), 0)
+    end
 
     n_samples = length(first(cat_features))
     encoded = Matrix{Float64}(undef, n_samples, n_cat)

@@ -92,20 +92,25 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
     p = merge(m.params, Dict{Symbol,Any}(kwargs...))
     default_loss = m isa MichiBoostRegressor ? "RMSE" : "Logloss"
 
-    m.model = train(pool;
-        iterations            = Int(get(p, :iterations, 1000)),
-        learning_rate         = Float64(get(p, :learning_rate, 0.03)),
-        depth                 = Int(get(p, :depth, 6)),
-        l2_leaf_reg           = Float64(get(p, :l2_leaf_reg, 3.0)),
-        loss_function         = String(get(p, :loss_function, default_loss)),
-        border_count          = Int(get(p, :border_count, 254)),
-        min_data_in_leaf      = Int(get(p, :min_data_in_leaf, 1)),
-        random_seed           = let v = get(p, :random_seed, nothing); v === nothing ? nothing : Int(v) end,
-        verbose               = Bool(get(p, :verbose, false)),
-        rsm                   = Float64(get(p, :rsm, 1.0)),
-        early_stopping_rounds = let v = get(p, :early_stopping_rounds, nothing); v === nothing ? nothing : Int(v) end,
-        eval_pool             = eval_set isa Pool ? eval_set : nothing,
-        boosting_type         = String(get(p, :boosting_type, "Ordered")),
+    m.model = train(
+        pool;
+        iterations=Int(get(p, :iterations, 1000)),
+        learning_rate=Float64(get(p, :learning_rate, 0.03)),
+        depth=Int(get(p, :depth, 6)),
+        l2_leaf_reg=Float64(get(p, :l2_leaf_reg, 3.0)),
+        loss_function=String(get(p, :loss_function, default_loss)),
+        border_count=Int(get(p, :border_count, 254)),
+        min_data_in_leaf=Int(get(p, :min_data_in_leaf, 1)),
+        random_seed=let v = get(p, :random_seed, nothing)
+            v === nothing ? nothing : Int(v)
+        end,
+        verbose=Bool(get(p, :verbose, false)),
+        rsm=Float64(get(p, :rsm, 1.0)),
+        early_stopping_rounds=let v = get(p, :early_stopping_rounds, nothing)
+            v === nothing ? nothing : Int(v)
+        end,
+        eval_pool=eval_set isa Pool ? eval_set : nothing,
+        boosting_type=String(get(p, :boosting_type, "Ordered")),
     )
     return m
 end
@@ -138,15 +143,19 @@ Generate predictions from a trained model.
 ŷ = predict(model, X_test)
 ```
 """
-function predict(m::MichiBoostWrapper, data; prediction_type::String="Class",
-                 cat_features=nothing)
+function predict(
+    m::MichiBoostWrapper,
+    data;
+    prediction_type::String="Class",
+    cat_features=nothing,
+)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
     pool = data isa Pool ? data : Pool(data; cat_features)
 
     prediction_type == "RawFormulaVal" && return _predict_raw(m.model, pool)
-    prediction_type == "Probability"   && return MichiBoost.predict(m.model, pool)
+    prediction_type == "Probability" && return MichiBoost.predict(m.model, pool)
     return m isa MichiBoostClassifier ? predict_classes(m.model, pool) :
-                                        MichiBoost.predict(m.model, pool)
+           MichiBoost.predict(m.model, pool)
 end
 
 """
@@ -174,24 +183,36 @@ end
 Return predicted class labels from a trained classifier.  Equivalent to
 `predict(model, data; prediction_type="Class")` for classifiers.
 """
-function predict_classes end  # actual method is on MichiBoostModel in predict.jl
+function predict_classes end  # Actual method is on MichiBoostModel in predict.jl
 
 function _predict_raw(model::MichiBoostModel, pool::Pool)
     n = pool.n_samples
-    num_bins = n_numerical(pool) > 0 ?
-               apply_borders(pool.features_numerical, model.borders) :
-               Matrix{UInt16}(undef, n, 0)
-    cat_enc = n_categorical(pool) > 0 && model.encoder !== nothing ?
-              encode_categorical(model.encoder, pool.features_categorical) :
-              Matrix{Float64}(undef, n, 0)
+    num_bins = if n_numerical(pool) > 0
+        apply_borders(pool.features_numerical, model.borders)
+    else
+        Matrix{UInt16}(undef, n, 0)
+    end
+    cat_enc = if n_categorical(pool) > 0 && model.encoder !== nothing
+        encode_categorical(model.encoder, pool.features_categorical)
+    else
+        Matrix{Float64}(undef, n, 0)
+    end
 
     if model.is_multiclass
         preds = repeat(model.initial_pred', n, 1)
-        for tree in model.trees; preds .+= model.learning_rate .* predict_tree_multiclass(tree, num_bins, cat_enc); end
+        for tree in model.trees
+            preds .+= model.learning_rate .* predict_tree_multiclass(
+                tree,
+                num_bins,
+                cat_enc,
+            )
+        end
         return preds
     else
         preds = fill(model.initial_pred::Float64, n)
-        for tree in model.trees; preds .+= model.learning_rate .* predict_tree(tree, num_bins, cat_enc); end
+        for tree in model.trees
+            preds .+= model.learning_rate .* predict_tree(tree, num_bins, cat_enc)
+        end
         return preds
     end
 end
@@ -243,7 +264,7 @@ loaded = load_model("my_model.jls")
 predict(loaded, X_test)  # works with the raw MichiBoostModel
 ```
 """
-function load_model end  # actual method in io.jl
+function load_model end  # Actual method in io.jl
 
 """
     cv(pool::Pool; params=Dict(), fold_count=3, shuffle=true,
@@ -275,11 +296,22 @@ result = cv(pool; fold_count=5,
 println("Mean test loss: ", result.mean_test_loss)
 ```
 """
-function cv(pool::Pool; params=Dict(), fold_count::Int=3, shuffle::Bool=true,
-            random_seed::Int=0, verbose::Bool=false, kwargs...)
+function cv(
+    pool::Pool;
+    params=Dict(),
+    fold_count::Int=3,
+    shuffle::Bool=true,
+    random_seed::Int=0,
+    verbose::Bool=false,
+    kwargs...,
+)
     all_params = Dict{Symbol,Any}()
-    for (k, v) in params; all_params[Symbol(k)] = v; end
-    for (k, v) in kwargs; all_params[k] = v; end
+    for (k, v) in params
+        all_params[Symbol(k)] = v
+    end
+    for (k, v) in kwargs
+        all_params[k] = v
+    end
 
     label = get_label(pool)
     n = pool.n_samples
@@ -293,31 +325,44 @@ function cv(pool::Pool; params=Dict(), fold_count::Int=3, shuffle::Bool=true,
     for fold in 1:fold_count
         ts = (fold - 1) * fold_size + 1
         te = fold == fold_count ? n : fold * fold_size
-        test_idx  = indices[ts:te]
-        train_idx = vcat(indices[1:ts-1], indices[te+1:end])
+        test_idx = indices[ts:te]
+        train_idx = vcat(indices[1:(ts - 1)], indices[(te + 1):end])
 
         train_pool = slice(pool, train_idx)
-        test_pool  = slice(pool, test_idx)
+        test_pool = slice(pool, test_idx)
 
-        model = train(train_pool;
-            iterations    = Int(get(all_params, :iterations, 1000)),
-            learning_rate = Float64(get(all_params, :learning_rate, 0.03)),
-            depth         = Int(get(all_params, :depth, 6)),
-            l2_leaf_reg   = Float64(get(all_params, :l2_leaf_reg, 3.0)),
-            loss_function = String(loss_fn),
-            verbose       = Bool(verbose),
-            random_seed   = random_seed)
+        model = train(
+            train_pool;
+            iterations=Int(get(all_params, :iterations, 1000)),
+            learning_rate=Float64(get(all_params, :learning_rate, 0.03)),
+            depth=Int(get(all_params, :depth, 6)),
+            l2_leaf_reg=Float64(get(all_params, :l2_leaf_reg, 3.0)),
+            loss_function=String(loss_fn),
+            verbose=Bool(verbose),
+            random_seed=random_seed,
+        )
 
         lf = make_loss(String(loss_fn))
         if model.is_multiclass || model.n_classes == 2
-            push!(train_losses, 0.0); push!(test_losses, 0.0)
+            push!(train_losses, 0.0)
+            push!(test_losses, 0.0)
         else
-            push!(train_losses, loss(lf, get_label(train_pool), MichiBoost.predict(model, train_pool)))
-            push!(test_losses,  loss(lf, get_label(test_pool),  MichiBoost.predict(model, test_pool)))
+            train_pred = MichiBoost.predict(model, train_pool)
+            test_pred = MichiBoost.predict(model, test_pool)
+            push!(train_losses, loss(lf, get_label(train_pool), train_pred))
+            push!(test_losses, loss(lf, get_label(test_pool), test_pred))
         end
-        verbose && println("Fold $fold/$fold_count: train=$(last(train_losses)), test=$(last(test_losses))")
+        if verbose
+            train_str = last(train_losses)
+            test_str = last(test_losses)
+            println("Fold $fold/$fold_count: train=$train_str, test=$test_str")
+        end
     end
 
-    return (train_loss=train_losses, test_loss=test_losses,
-            mean_train_loss=mean(train_losses), mean_test_loss=mean(test_losses))
+    return (
+        train_loss=train_losses,
+        test_loss=test_losses,
+        mean_train_loss=mean(train_losses),
+        mean_test_loss=mean(test_losses),
+    )
 end
