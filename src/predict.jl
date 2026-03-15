@@ -16,7 +16,7 @@ end
 """
     predict(model::MichiBoostModel, pool::Pool)
 
-Low-level prediction on a fitted [`MichiBoostModel`](@ref).
+Low-level prediction on a fitted `MichiBoostModel`.
 
 Returns:
 - **Regression**: `Vector{Float64}` of predicted values.
@@ -47,7 +47,7 @@ end
 """
     predict_classes(model::MichiBoostModel, pool::Pool)
 
-Return predicted class labels from a fitted [`MichiBoostModel`](@ref).
+Return predicted class labels from a fitted `MichiBoostModel`.
 
 - **Binary**: returns the label with probability ≥ 0.5.
 - **Multi-class**: returns the label with the highest probability.

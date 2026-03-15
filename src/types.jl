@@ -19,7 +19,7 @@ Stores numerical features as a `Float64` matrix, categorical features as
 integer-encoded vectors, labels, sample weights, and feature metadata.
 String columns are automatically detected as categorical.
 
-Construct with [`Pool(data; label, cat_features, ...)`](@ref).
+Construct with `Pool(data; label, cat_features, ...)`.
 
 # Fields
 - `n_samples::Int` — number of rows
@@ -82,9 +82,9 @@ end
 """
     MichiBoostModel
 
-The fitted model produced by [`train`](@ref) (or stored inside a
-[`MichiBoostRegressor`](@ref) / [`MichiBoostClassifier`](@ref) after
-[`fit!`](@ref)).  Contains the tree ensemble and everything needed for
+The fitted model produced by `train` (or stored inside a
+`MichiBoostRegressor` / `MichiBoostClassifier` after
+`fit!`).  Contains the tree ensemble and everything needed for
 prediction.
 
 Not typically constructed directly — use `fit!` or `train` instead.
@@ -107,10 +107,10 @@ end
 
 A gradient-boosted regression model using symmetric (oblivious) decision trees.
 
-Create with [`MichiBoostRegressor(; kwargs...)`](@ref), train with
-[`fit!`](@ref), and generate predictions with [`predict`](@ref).
+Create with `MichiBoostRegressor(; kwargs...)`, train with
+`fit!`, and generate predictions with `predict`.
 
-After training, the fitted [`MichiBoostModel`](@ref) is accessible via the
+After training, the fitted `MichiBoostModel` is accessible via the
 `.model` field.
 """
 mutable struct MichiBoostRegressor
@@ -124,11 +124,11 @@ end
 A gradient-boosted classification model using symmetric (oblivious) decision
 trees.  Supports binary (Logloss) and multi-class (Softmax) targets.
 
-Create with [`MichiBoostClassifier(; kwargs...)`](@ref), train with
-[`fit!`](@ref), and generate predictions with [`predict`](@ref),
-[`predict_proba`](@ref), or [`predict_classes`](@ref).
+Create with `MichiBoostClassifier(; kwargs...)`, train with
+`fit!`, and generate predictions with `predict`,
+`predict_proba`, or `predict_classes`.
 
-After training, the fitted [`MichiBoostModel`](@ref) is accessible via the
+After training, the fitted `MichiBoostModel` is accessible via the
 `.model` field.
 """
 mutable struct MichiBoostClassifier

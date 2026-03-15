@@ -1,9 +1,9 @@
 # MichiBoost.jl vs CatBoost.jl (Python wrapper) — Correctness & Benchmark
 #
-# Run standalone:  julia --project=. test/benchmark_vs_catboost.jl
+# Run standalone:
+#   julia --project=test/benchmark_project test/benchmark_vs_catboost.jl
 #
-# Requires extras: PythonCall, CondaPkg, BenchmarkTools
-# (listed in [extras] of Project.toml — install with Pkg.add if needed)
+# The benchmark_project has all required dependencies pre-configured.
 #
 # This file:
 #   1. Trains both implementations on identical data with the same hyperparams.

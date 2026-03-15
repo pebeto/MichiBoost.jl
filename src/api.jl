@@ -9,7 +9,7 @@ Create a gradient-boosted regression model.
 - `depth::Int=6` — depth of each symmetric tree.
 - `l2_leaf_reg::Float64=3.0` — L2 regularisation on leaf values.
 - `loss_function::String="RMSE"` — `"RMSE"` or `"MAE"`.
-- `border_count::Int=254` — max quantisation borders per numerical feature.
+- `border_count::Int=254` — max quantization borders per numerical feature.
 - `min_data_in_leaf::Int=1` — minimum samples required in a leaf.
 - `random_seed::Union{Int,Nothing}=nothing` — seed for reproducibility.
 - `verbose::Bool=false` — print training progress.
@@ -37,7 +37,7 @@ Create a gradient-boosted classification model.  Supports binary (Logloss) and
 multi-class (Softmax) targets.  Multi-class is auto-detected when the target has
 more than two unique values.
 
-Accepts the same keyword arguments as [`MichiBoostRegressor`](@ref), plus:
+Accepts the same keyword arguments as `MichiBoostRegressor`, plus:
 
 - `loss_function::String="Logloss"` — `"Logloss"` for binary, `"MultiClass"`
   for multi-class (auto-detected if omitted).
@@ -63,8 +63,8 @@ end
 Train `model` in-place on the given data.
 
 # Arguments
-- `model` — a [`MichiBoostRegressor`](@ref) or [`MichiBoostClassifier`](@ref).
-- `data` — a table, matrix, or [`Pool`](@ref).
+- `model` — a `MichiBoostRegressor` or `MichiBoostClassifier`.
+- `data` — a table, matrix, or `Pool`.
 - `labels` — target vector (ignored when `data` is a `Pool` that already has a
   label).
 - `cat_features` — categorical column indices (0-based) or names.
@@ -121,9 +121,9 @@ end
 Generate predictions from a trained model.
 
 # Arguments
-- `model` — a trained [`MichiBoostRegressor`](@ref) or
-  [`MichiBoostClassifier`](@ref).
-- `data` — a table, matrix, or [`Pool`](@ref).
+- `model` — a trained `MichiBoostRegressor` or
+  `MichiBoostClassifier`.
+- `data` — a table, matrix, or `Pool`.
 - `prediction_type` — one of:
   - `"Class"` (default) — regression values, or predicted class labels for
     classifiers.
@@ -242,10 +242,10 @@ end
 
 Serialize a trained model to disk using Julia's `Serialization` module.
 
-Works with both wrapper types ([`MichiBoostRegressor`](@ref),
-[`MichiBoostClassifier`](@ref)) and raw [`MichiBoostModel`](@ref) objects.
+Works with both wrapper types (`MichiBoostRegressor`,
+`MichiBoostClassifier`) and raw `MichiBoostModel` objects.
 
-See also [`load_model`](@ref).
+See also `load_model`.
 """
 function save_model(m::MichiBoostWrapper, filepath::AbstractString)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
@@ -255,7 +255,7 @@ end
 """
     load_model(filepath::AbstractString) -> MichiBoostModel
 
-Load a model previously saved with [`save_model`](@ref).
+Load a model previously saved with `save_model`.
 
 # Example
 ```julia
@@ -273,7 +273,7 @@ function load_model end  # Actual method in io.jl
 Perform k-fold cross-validation on the given `Pool`.
 
 # Arguments
-- `pool` — a [`Pool`](@ref) with labels.
+- `pool` — a `Pool` with labels.
 - `params` — `Dict` of training hyperparameters (string or symbol keys).
 - `fold_count` — number of folds.
 - `shuffle` — whether to shuffle indices before splitting.
