@@ -343,10 +343,40 @@ function cv(
         )
 
         lf = make_loss(String(loss_fn))
-        if model.is_multiclass || model.n_classes == 2
-            push!(train_losses, 0.0)
-            push!(test_losses, 0.0)
+        
+        if model.is_multiclass
+            # Get raw logits for multiclass
+            train_logits = _predict_raw_logits(model, train_pool)
+            test_logits = _predict_raw_logits(model, test_pool)
+            
+            # Convert labels to one-hot encoding
+            train_y = get_label(train_pool)
+            test_y = get_label(test_pool)
+            class_labels = sort(unique(vcat(train_y, test_y)))
+            n_classes = length(class_labels)
+            label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
+            
+            train_y_onehot = zeros(Float64, length(train_y), n_classes)
+            for i in eachindex(train_y)
+                train_y_onehot[i, label_map[train_y[i]]] = 1.0
+            end
+            
+            test_y_onehot = zeros(Float64, length(test_y), n_classes)
+            for i in eachindex(test_y)
+                test_y_onehot[i, label_map[test_y[i]]] = 1.0
+            end
+            
+            push!(train_losses, loss(lf, train_y_onehot, train_logits))
+            push!(test_losses, loss(lf, test_y_onehot, test_logits))
+        elseif model.n_classes == 2
+            # Get raw logits for binary classification
+            train_logits = _predict_raw_logits(model, train_pool)
+            test_logits = _predict_raw_logits(model, test_pool)
+            
+            push!(train_losses, loss(lf, get_label(train_pool), train_logits))
+            push!(test_losses, loss(lf, get_label(test_pool), test_logits))
         else
+            # Regression
             train_pred = MichiBoost.predict(model, train_pool)
             test_pred = MichiBoost.predict(model, test_pool)
             push!(train_losses, loss(lf, get_label(train_pool), train_pred))
@@ -365,4 +395,23 @@ function cv(
         mean_train_loss=mean(train_losses),
         mean_test_loss=mean(test_losses),
     )
+end
+
+function _predict_raw_logits(model::MichiBoostModel, pool::Pool)
+    num_bins, cat_encoded = _prepare_features(model, pool)
+    n = pool.n_samples
+
+    if model.is_multiclass
+        preds = repeat(model.initial_pred', n, 1)
+        for tree in model.trees
+            predict_tree_mc!(preds, tree, num_bins, cat_encoded, model.learning_rate)
+        end
+        return preds
+    else
+        preds = fill(model.initial_pred::Float64, n)
+        for tree in model.trees
+            predict_tree!(preds, tree, num_bins, cat_encoded, model.learning_rate)
+        end
+        return preds
+    end
 end

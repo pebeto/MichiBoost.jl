@@ -106,13 +106,58 @@
     end
 
     @testset "Cross-validation" begin
-        data = (x1=randn(20), x2=randn(20))
-        labels = randn(20)
-        pool = Pool(data; label=labels)
+        @testset "Regression CV" begin
+            data = (x1=randn(20), x2=randn(20))
+            labels = randn(20)
+            pool = Pool(data; label=labels)
 
-        scores = cv(pool; fold_count=2, verbose=false,
-                    params=Dict("iterations" => 10, "depth" => 2, "loss_function" => "RMSE"))
-        @test haskey(scores, :mean_test_loss)
-        @test length(scores.test_loss) == 2
+            scores = cv(pool; fold_count=2, verbose=false,
+                        params=Dict("iterations" => 10, "depth" => 2, "loss_function" => "RMSE"))
+            @test haskey(scores, :mean_test_loss)
+            @test length(scores.test_loss) == 2
+            @test scores.mean_train_loss > 0.0
+            @test scores.mean_test_loss > 0.0
+        end
+
+        @testset "Binary classification CV" begin
+            using Random
+            Random.seed!(42)
+            n = 100
+            X = randn(n, 3)
+            y = Float64.([X[i, 1] + X[i, 2] > 0 for i in 1:n])
+            pool = Pool(X; label=y)
+
+            scores = cv(pool; fold_count=3, verbose=false,
+                        params=Dict("iterations" => 20, "depth" => 3, "loss_function" => "Logloss"))
+            @test haskey(scores, :mean_test_loss)
+            @test length(scores.test_loss) == 3
+            @test scores.mean_train_loss > 0.0
+            @test scores.mean_test_loss > 0.0
+            @test all(x -> x > 0.0, scores.train_loss)
+            @test all(x -> x > 0.0, scores.test_loss)
+        end
+
+        @testset "Multiclass classification CV" begin
+            using Random
+            Random.seed!(123)
+            n = 150
+            X = randn(n, 4)
+            y = Float64.([
+                (X[i, 1] > 0.5) ? 1.0 : 
+                (X[i, 2] > 0.5) ? 2.0 : 
+                3.0 
+                for i in 1:n
+            ])
+            pool = Pool(X; label=y)
+
+            scores = cv(pool; fold_count=3, verbose=false,
+                        params=Dict("iterations" => 20, "depth" => 3, "loss_function" => "MultiClass"))
+            @test haskey(scores, :mean_test_loss)
+            @test length(scores.test_loss) == 3
+            @test scores.mean_train_loss > 0.0
+            @test scores.mean_test_loss > 0.0
+            @test all(x -> x > 0.0, scores.train_loss)
+            @test all(x -> x > 0.0, scores.test_loss)
+        end
     end
 end
