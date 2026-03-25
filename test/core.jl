@@ -105,6 +105,25 @@
         rm(tmpfile; force=true)
     end
 
+    @testset "RSM feature subsampling" begin
+        using Random
+        Random.seed!(42)
+        X = randn(100, 6)
+        y = X[:, 1] .+ X[:, 2] .+ randn(100) .* 0.1
+
+        model_full = MichiBoostRegressor(; iterations=20, depth=3, rsm=1.0, random_seed=1, verbose=false)
+        MichiBoost.fit!(model_full, X, y)
+
+        model_rsm = MichiBoostRegressor(; iterations=20, depth=3, rsm=0.5, random_seed=1, verbose=false)
+        MichiBoost.fit!(model_rsm, X, y)
+
+        preds_full = MichiBoost.predict(model_full, X)
+        preds_rsm = MichiBoost.predict(model_rsm, X)
+        @test length(preds_rsm) == 100
+        @test all(isfinite, preds_rsm)
+        @test preds_full != preds_rsm
+    end
+
     @testset "Cross-validation" begin
         @testset "Regression CV" begin
             data = (x1=randn(20), x2=randn(20))

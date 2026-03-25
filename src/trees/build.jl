@@ -10,19 +10,28 @@ function build_symmetric_tree(
     qf::QuantizedFeatures;
     l2_leaf_reg::Float64=3.0,
     min_data_in_leaf::Int=1,
+    rsm::Float64=1.0,
+    rng::AbstractRNG=MersenneTwister(),
 )
+    n_features = n_num + n_cat
+    n_sampled = max(1, round(Int, rsm * n_features))
+
     split_features, split_types, split_thresholds = Int[], Symbol[], Float64[]
     leaf_groups = [sample_indices]
 
     for _ in 1:depth
+        sampled = randperm(rng, n_features)[1:n_sampled]
+        sampled_num = filter(i -> i <= n_num, sampled)
+        sampled_cat = filter(i -> i > n_num, sampled) .- n_num
+
         best = _find_best_split_across_leaves(
             gradients,
             hessians,
             num_bins,
             cat_encoded,
             leaf_groups,
-            n_num,
-            n_cat,
+            sampled_num,
+            sampled_cat,
             qf;
             l2_leaf_reg,
             min_data_in_leaf,
@@ -71,19 +80,28 @@ function build_symmetric_tree_multiclass(
     n_classes::Int;
     l2_leaf_reg::Float64=3.0,
     min_data_in_leaf::Int=1,
+    rsm::Float64=1.0,
+    rng::AbstractRNG=MersenneTwister(),
 )
+    n_features = n_num + n_cat
+    n_sampled = max(1, round(Int, rsm * n_features))
+
     split_features, split_types, split_thresholds = Int[], Symbol[], Float64[]
     leaf_groups = [sample_indices]
 
     for _ in 1:depth
+        sampled = randperm(rng, n_features)[1:n_sampled]
+        sampled_num = filter(i -> i <= n_num, sampled)
+        sampled_cat = filter(i -> i > n_num, sampled) .- n_num
+
         best = _find_best_split_across_leaves_mc(
             gradients,
             hessians,
             num_bins,
             cat_encoded,
             leaf_groups,
-            n_num,
-            n_cat,
+            sampled_num,
+            sampled_cat,
             qf,
             n_classes;
             l2_leaf_reg,
@@ -184,8 +202,8 @@ function _find_best_split_across_leaves(
     num_bins,
     cat_encoded,
     leaf_groups,
-    n_num,
-    n_cat,
+    sampled_num::AbstractVector{Int},
+    sampled_cat::AbstractVector{Int},
     qf;
     l2_leaf_reg=3.0,
     min_data_in_leaf=1,
@@ -193,7 +211,7 @@ function _find_best_split_across_leaves(
     best = SplitCandidate(0, :numerical, 0.0, -Inf)
 
     # Numerical features — build per-leaf histograms, then sweep
-    for j in 1:n_num
+    for j in sampled_num
         nb = qf.n_bins[j]
         if nb <= 1
             continue
@@ -259,7 +277,7 @@ function _find_best_split_across_leaves(
     end
 
     # Categorical features — collect all unique values, sweep
-    for j in 1:n_cat
+    for j in sampled_cat
         all_vals = Set{Float64}()
         for group in leaf_groups, idx in group
             push!(all_vals, cat_encoded[idx, j])
@@ -305,11 +323,12 @@ function _find_best_split_across_leaves(
 end
 
 function _find_best_split_across_leaves_mc(gradients, hessians, num_bins, cat_encoded,
-                                            leaf_groups, n_num, n_cat, qf, n_classes;
+                                            leaf_groups, sampled_num::AbstractVector{Int},
+                                            sampled_cat::AbstractVector{Int}, qf, n_classes;
                                             l2_leaf_reg=3.0, min_data_in_leaf=1)
     best = SplitCandidate(0, :numerical, 0.0, -Inf)
 
-    for j in 1:n_num
+    for j in sampled_num
         nb = qf.n_bins[j]
         nb <= 1 && continue
 
@@ -366,7 +385,7 @@ function _find_best_split_across_leaves_mc(gradients, hessians, num_bins, cat_en
     end
 
     # Categorical features
-    for j in 1:n_cat
+    for j in sampled_cat
         all_vals = Set{Float64}()
         for group in leaf_groups, idx in group; push!(all_vals, cat_encoded[idx, j]); end
         sorted_vals = sort(collect(all_vals))

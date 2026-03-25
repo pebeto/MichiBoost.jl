@@ -117,6 +117,8 @@ function train(
                 n_classes;
                 l2_leaf_reg,
                 min_data_in_leaf,
+                rsm,
+                rng,
             )
             push!(trees, tree)
             predict_tree_mc!(predictions, tree, qf.bins, cat_encoded, learning_rate)
@@ -135,6 +137,8 @@ function train(
                 qf;
                 l2_leaf_reg,
                 min_data_in_leaf,
+                rsm,
+                rng,
             )
             push!(trees, tree)
             predict_tree!(predictions, tree, qf.bins, cat_encoded, learning_rate)
