@@ -83,7 +83,21 @@ fit!(model, X_train, y_train)
 function fit!(m::MichiBoostWrapper, data, labels; cat_features=nothing, kwargs...)
     pool = data isa Pool ? data : Pool(data; label=labels, cat_features)
     if data isa Pool && data.label === nothing
-        pool = Pool(data.features_numerical; label=Float64.(labels), cat_features=nothing)
+        pool = Pool(
+            data.features_numerical,
+            data.features_categorical,
+            data.cat_mapping,
+            Float64.(labels),
+            data.label_mapping,
+            data.label_classes,
+            data.feature_names,
+            data.numerical_feature_indices,
+            data.categorical_feature_indices,
+            data.n_samples,
+            data.n_features,
+            data.weight,
+            data.group_id,
+        )
     end
     return fit!(m, pool; kwargs...)
 end

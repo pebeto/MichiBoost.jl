@@ -105,6 +105,27 @@
         rm(tmpfile; force=true)
     end
 
+    @testset "fit! with unlabeled Pool preserves categorical columns" begin
+        using DataFrames
+        df = DataFrame(
+            cat1=["a", "b", "a", "b", "c", "c", "a", "b"],
+            num1=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+        )
+        labels = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]
+
+        # Build an unlabeled Pool (no label kwarg)
+        unlabeled = Pool(df)
+        @test unlabeled.label === nothing
+        @test MichiBoost.n_categorical(unlabeled) == 1
+
+        model = MichiBoostClassifier(; iterations=10, depth=2, verbose=false)
+        MichiBoost.fit!(model, unlabeled, labels)
+
+        preds = MichiBoost.predict(model, df)
+        @test length(preds) == 8
+        @test all(isfinite, preds)
+    end
+
     @testset "RSM feature subsampling" begin
         using Random
         Random.seed!(42)
