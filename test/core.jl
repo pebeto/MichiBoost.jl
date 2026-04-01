@@ -105,6 +105,12 @@
         rm(tmpfile; force=true)
     end
 
+    @testset "encode_categorical on empty input" begin
+        encoder = MichiBoost.OrderedTargetEncoder(0.5, 1.0, Dict{UInt32,Tuple{Float64,Int}}[])
+        result = MichiBoost.encode_categorical(encoder, Vector{UInt32}[])
+        @test size(result) == (0, 0)
+    end
+
     @testset "fit! with unlabeled Pool preserves categorical columns" begin
         using DataFrames
         df = DataFrame(
@@ -113,7 +119,6 @@
         )
         labels = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]
 
-        # Build an unlabeled Pool (no label kwarg)
         unlabeled = Pool(df)
         @test unlabeled.label === nothing
         @test MichiBoost.n_categorical(unlabeled) == 1
@@ -183,9 +188,9 @@
             n = 150
             X = randn(n, 4)
             y = Float64.([
-                (X[i, 1] > 0.5) ? 1.0 : 
-                (X[i, 2] > 0.5) ? 2.0 : 
-                3.0 
+                (X[i, 1] > 0.5) ? 1.0 :
+                (X[i, 2] > 0.5) ? 2.0 :
+                3.0
                 for i in 1:n
             ])
             pool = Pool(X; label=y)

@@ -61,7 +61,7 @@ function encode_categorical(
 )
     n_cat = length(cat_features)
     if n_cat == 0
-        return Matrix{Float64}(undef, length(first(cat_features)), 0)
+        return Matrix{Float64}(undef, 0, 0)
     end
 
     n_samples = length(first(cat_features))
