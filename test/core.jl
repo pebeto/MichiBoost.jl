@@ -71,6 +71,9 @@
         feat_importance = feature_importance(model)
         @test length(feat_importance) > 0
         @test all(p -> p isa Pair{Symbol,Float64}, feat_importance)
+        # Names should be real column names (x1..x4), not generic num_1 etc.
+        returned_names = Set(first.(feat_importance))
+        @test returned_names ⊆ Set([:x1, :x2, :x3, :x4])
     end
 
     @testset "Categorical features" begin

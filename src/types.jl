@@ -100,6 +100,8 @@ mutable struct MichiBoostModel
     n_classes::Int
     class_labels::Vector
     is_multiclass::Bool
+    numerical_feature_indices::Vector{Int}
+    categorical_feature_indices::Vector{Int}
 end
 
 """

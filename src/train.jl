@@ -193,6 +193,8 @@ function train(
         n_classes,
         class_labels_final,
         is_multiclass,
+        pool.numerical_feature_indices,
+        pool.categorical_feature_indices,
     )
 end
 

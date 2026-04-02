@@ -81,30 +81,38 @@ function feature_importance(model::MichiBoostModel)
     else
         0
     end
-    importance = Dict{Int,Float64}()
+    importance = Dict{Symbol,Float64}()
 
     for tree in model.trees, k in 1:tree.depth
-        idx = if tree.split_feature_types[k] == :numerical
-            tree.split_feature_indices[k]
+        name = if tree.split_feature_types[k] == :numerical
+            j = tree.split_feature_indices[k]
+            if j <= length(model.numerical_feature_indices)
+                model.feature_names[model.numerical_feature_indices[j]]
+            else
+                Symbol("num_$j")
+            end
         else
-            n_num + tree.split_feature_indices[k]
+            j = tree.split_feature_indices[k]
+            if j <= length(model.categorical_feature_indices)
+                model.feature_names[model.categorical_feature_indices[j]]
+            else
+                Symbol("cat_$j")
+            end
         end
-        importance[idx] = get(importance, idx, 0.0) + 1.0
+        importance[name] = get(importance, name, 0.0) + 1.0
     end
 
     total = max(sum(values(importance); init=0.0), 1e-10)
-    names = vcat(
-        [Symbol("num_$i") for i in 1:n_num],
-        [Symbol("cat_$i") for i in 1:n_cat],
-    )
+
+    # Collect all feature names in original column order
+    all_names = model.feature_names
 
     result = Pair{Symbol,Float64}[]
-    for (idx, imp) in sort(collect(importance); by=x -> -x[2])
-        name = idx <= length(names) ? names[idx] : Symbol("feature_$idx")
+    for (name, imp) in sort(collect(importance); by=x -> -x[2])
         push!(result, name => 100.0 * imp / total)
     end
-    for idx in 1:(n_num + n_cat)
-        haskey(importance, idx) || push!(result, names[idx] => 0.0)
+    for name in all_names
+        haskey(importance, name) || push!(result, name => 0.0)
     end
     return result
 end
