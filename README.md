@@ -8,7 +8,6 @@ A pure Julia implementation of gradient boosting with ordered target statistics 
 
 - **Pure Julia** — no Python, no C++ bindings, no CondaPkg
 - **Ordered target statistics** for native categorical feature handling without preprocessing
-- **Ordered boosting** to prevent target leakage during gradient computation
 - **Symmetric (oblivious) trees** as the base learner — strong regularization and fast inference
 - **Histogram-based split finding** with quantile-based feature binning
 - Regression (RMSE, MAE), binary classification (Logloss), and multi-class (Softmax)

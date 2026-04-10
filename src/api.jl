@@ -13,7 +13,9 @@ Create a gradient-boosted regression model.
 - `min_data_in_leaf::Int=1` — minimum samples required in a leaf.
 - `random_seed::Union{Int,Nothing}=nothing` — seed for reproducibility.
 - `verbose::Bool=false` — print training progress.
-- `boosting_type::String="Ordered"` — `"Ordered"` (default) or `"Plain"`.
+- `boosting_type::String="Ordered"` — `"Ordered"` uses a random permutation when
+  computing categorical target statistics (reduces leakage); `"Plain"` encodes
+  on the full training set.  Gradient computation is plain in both modes.
 - `early_stopping_rounds::Union{Int,Nothing}=nothing` — stop after this many
   rounds without improvement on `eval_set`.
 
