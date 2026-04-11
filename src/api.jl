@@ -354,6 +354,10 @@ function cv(
             depth=Int(get(all_params, :depth, 6)),
             l2_leaf_reg=Float64(get(all_params, :l2_leaf_reg, 3.0)),
             loss_function=String(loss_fn),
+            border_count=Int(get(all_params, :border_count, 254)),
+            min_data_in_leaf=Int(get(all_params, :min_data_in_leaf, 1)),
+            rsm=Float64(get(all_params, :rsm, 1.0)),
+            boosting_type=String(get(all_params, :boosting_type, "Ordered")),
             verbose=Bool(verbose),
             random_seed=random_seed,
         )

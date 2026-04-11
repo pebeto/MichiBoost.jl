@@ -167,6 +167,23 @@
             @test scores.mean_test_loss > 0.0
         end
 
+        @testset "cv() forwards all params" begin
+            using Random
+            Random.seed!(7)
+            X = randn(120, 6)
+            y = X[:, 1] .+ X[:, 2] .+ randn(120) .* 0.1
+            pool = Pool(X; label=y)
+
+            s1 = cv(pool; fold_count=2, random_seed=1,
+                    params=Dict("iterations" => 20, "depth" => 3,
+                                "rsm" => 1.0, "loss_function" => "RMSE"))
+            s2 = cv(pool; fold_count=2, random_seed=1,
+                    params=Dict("iterations" => 20, "depth" => 3,
+                                "rsm" => 0.3, "loss_function" => "RMSE"))
+            # Different rsm must produce different losses
+            @test s1.train_loss != s2.train_loss
+        end
+
         @testset "Binary classification CV" begin
             using Random
             Random.seed!(42)
