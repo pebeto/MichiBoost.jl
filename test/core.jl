@@ -224,5 +224,17 @@
             @test all(x -> x > 0.0, scores.train_loss)
             @test all(x -> x > 0.0, scores.test_loss)
         end
+
+        @testset "Multiclass CV class-imbalanced folds" begin
+            # Class 3 appears only twice — with 3 folds it will be absent from
+            # at least one training fold, triggering the dimension mismatch bug.
+            X = Float64.(reshape(1:30, 10, 3))
+            y = [1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0, 3.0]
+            pool = Pool(X; label=y)
+
+            @test_nowarn cv(pool; fold_count=3, shuffle=false, random_seed=0,
+                            params=Dict("iterations" => 5, "depth" => 2,
+                                        "loss_function" => "MultiClass"))
+        end
     end
 end

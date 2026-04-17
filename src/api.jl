@@ -365,27 +365,31 @@ function cv(
         lf = make_loss(String(loss_fn))
         
         if model.is_multiclass
-            # Get raw logits for multiclass
             train_logits = _predict_raw_logits(model, train_pool)
             test_logits = _predict_raw_logits(model, test_pool)
-            
-            # Convert labels to one-hot encoding
+
+            # Use the model's own class labels — avoids dimension mismatch when
+            # a class is absent from the training fold but present in the test fold.
+            n_classes = model.n_classes
+            label_map = Dict(model.class_labels[i] => i for i in 1:n_classes)
+
             train_y = get_label(train_pool)
-            test_y = get_label(test_pool)
-            class_labels = sort(unique(vcat(train_y, test_y)))
-            n_classes = length(class_labels)
-            label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
-            
             train_y_onehot = zeros(Float64, length(train_y), n_classes)
             for i in eachindex(train_y)
                 train_y_onehot[i, label_map[train_y[i]]] = 1.0
             end
-            
+
+            test_y = get_label(test_pool)
             test_y_onehot = zeros(Float64, length(test_y), n_classes)
             for i in eachindex(test_y)
-                test_y_onehot[i, label_map[test_y[i]]] = 1.0
+                # Labels unseen during training have no column — treat as
+                # uniform (all-zero one-hot), contributing maximum loss.
+                col = get(label_map, test_y[i], 0)
+                if col > 0
+                    test_y_onehot[i, col] = 1.0
+                end
             end
-            
+
             push!(train_losses, loss(lf, train_y_onehot, train_logits))
             push!(test_losses, loss(lf, test_y_onehot, test_logits))
         elseif model.n_classes == 2
