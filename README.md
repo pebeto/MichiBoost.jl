@@ -1,8 +1,12 @@
 # MichiBoost.jl
 
+[![CI](https://github.com/pebeto/MichiBoost.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/pebeto/MichiBoost.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/github/pebeto/MichiBoost.jl/graph/badge.svg?token=3RIH95Q485)](https://codecov.io/github/pebeto/MichiBoost.jl)
+[![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+
 A pure Julia implementation of gradient boosting with ordered target statistics and symmetric (oblivious) decision trees, inspired by the [CatBoost](https://catboost.ai/) algorithm.
 
-*Michi (ミチ) means cat in Japanese.*
+_Michi (ミチ) means cat in Japanese._
 
 ## Features
 
@@ -73,30 +77,31 @@ MichiBoost.jl has been validated against the reference CatBoost implementation (
 
 ### Correctness
 
-| Task | Metric | Result |
-|------|--------|--------|
-| **Regression** | Prediction correlation | r = 0.99 |
-| | RMSE (CatBoost) | 1.55 |
-| | RMSE (MichiBoost) | 1.17 |
+| Task                      | Metric                  | Result   |
+| ------------------------- | ----------------------- | -------- |
+| **Regression**            | Prediction correlation  | r = 0.99 |
+|                           | RMSE (CatBoost)         | 1.55     |
+|                           | RMSE (MichiBoost)       | 1.17     |
 | **Binary Classification** | Probability correlation | r = 0.97 |
-| | Class agreement | 96.5% |
-| | Accuracy (CatBoost) | 94.5% |
-| | Accuracy (MichiBoost) | 97.0% |
-| **Multi-class** | Class agreement | 87.0% |
-| | Accuracy (CatBoost) | 86.7% |
-| | Accuracy (MichiBoost) | 97.3% |
+|                           | Class agreement         | 96.5%    |
+|                           | Accuracy (CatBoost)     | 94.5%    |
+|                           | Accuracy (MichiBoost)   | 97.0%    |
+| **Multi-class**           | Class agreement         | 87.0%    |
+|                           | Accuracy (CatBoost)     | 86.7%    |
+|                           | Accuracy (MichiBoost)   | 97.3%    |
 
 ### Performance
 
-| Dataset | Task | CatBoost Training | MichiBoost Training |
-|---------|------|-------------------|---------------------|
-| Small (200×10) | Regression | 94.3 ms | **64.2 ms** |
-| Medium (2000×20) | Regression | **125.5 ms** | 320.2 ms |
-| 1000×15 | Binary Classification | **107.6 ms** | 178.5 ms |
+| Dataset          | Task                  | CatBoost Training | MichiBoost Training |
+| ---------------- | --------------------- | ----------------- | ------------------- |
+| Small (200×10)   | Regression            | 94.3 ms           | **64.2 ms**         |
+| Medium (2000×20) | Regression            | **125.5 ms**      | 320.2 ms            |
+| 1000×15          | Binary Classification | **107.6 ms**      | 178.5 ms            |
 
 MichiBoost.jl shows excellent agreement with CatBoost, with high correlation and comparable or better accuracy. Performance is competitive on small datasets, while CatBoost's optimized C++ implementation is faster on larger datasets.
 
 Run the validation yourself:
+
 ```bash
 julia --project=test/benchmark_project test/benchmark_vs_catboost.jl
 ```
