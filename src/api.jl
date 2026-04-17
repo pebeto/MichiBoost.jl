@@ -381,17 +381,30 @@ function cv(
 
             test_y = get_label(test_pool)
             test_y_onehot = zeros(Float64, length(test_y), n_classes)
+            unseen_loss = log(Float64(n_classes))  # -log(1/n_classes): uniform prior
+            unseen_count = 0
             for i in eachindex(test_y)
-                # Labels unseen during training have no column — treat as
-                # uniform (all-zero one-hot), contributing maximum loss.
                 col = get(label_map, test_y[i], 0)
                 if col > 0
                     test_y_onehot[i, col] = 1.0
+                else
+                    unseen_count += 1
                 end
             end
 
+            seen_count = length(test_y) - unseen_count
+            base_test_loss = if seen_count > 0
+                # Compute loss only over samples whose class the model knows
+                seen_mask = [get(label_map, test_y[i], 0) > 0 for i in eachindex(test_y)]
+                loss(lf, test_y_onehot[seen_mask, :], test_logits[seen_mask, :])
+            else
+                0.0
+            end
+            # Blend in uniform-prior loss for unseen samples
+            test_loss = (base_test_loss * seen_count + unseen_loss * unseen_count) / length(test_y)
+
             push!(train_losses, loss(lf, train_y_onehot, train_logits))
-            push!(test_losses, loss(lf, test_y_onehot, test_logits))
+            push!(test_losses, test_loss)
         elseif model.n_classes == 2
             train_logits = _predict_raw(model, train_pool)
             test_logits = _predict_raw(model, test_pool)
