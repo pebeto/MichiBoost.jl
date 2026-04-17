@@ -365,8 +365,8 @@ function cv(
         lf = make_loss(String(loss_fn))
         
         if model.is_multiclass
-            train_logits = _predict_raw_logits(model, train_pool)
-            test_logits = _predict_raw_logits(model, test_pool)
+            train_logits = _predict_raw(model, train_pool)
+            test_logits = _predict_raw(model, test_pool)
 
             # Use the model's own class labels — avoids dimension mismatch when
             # a class is absent from the training fold but present in the test fold.
@@ -393,9 +393,8 @@ function cv(
             push!(train_losses, loss(lf, train_y_onehot, train_logits))
             push!(test_losses, loss(lf, test_y_onehot, test_logits))
         elseif model.n_classes == 2
-            # Get raw logits for binary classification
-            train_logits = _predict_raw_logits(model, train_pool)
-            test_logits = _predict_raw_logits(model, test_pool)
+            train_logits = _predict_raw(model, train_pool)
+            test_logits = _predict_raw(model, test_pool)
             
             push!(train_losses, loss(lf, get_label(train_pool), train_logits))
             push!(test_losses, loss(lf, get_label(test_pool), test_logits))
@@ -421,21 +420,3 @@ function cv(
     )
 end
 
-function _predict_raw_logits(model::MichiBoostModel, pool::Pool)
-    num_bins, cat_encoded = _prepare_features(model, pool)
-    n = pool.n_samples
-
-    if model.is_multiclass
-        preds = repeat(model.initial_pred', n, 1)
-        for tree in model.trees
-            predict_tree_mc!(preds, tree, num_bins, cat_encoded, model.learning_rate)
-        end
-        return preds
-    else
-        preds = fill(model.initial_pred::Float64, n)
-        for tree in model.trees
-            predict_tree!(preds, tree, num_bins, cat_encoded, model.learning_rate)
-        end
-        return preds
-    end
-end
