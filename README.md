@@ -90,9 +90,9 @@ MichiBoost.jl has been validated against the reference CatBoost implementation (
 
 | Dataset | Task | CatBoost Training | MichiBoost Training |
 |---------|------|-------------------|---------------------|
-| Small (200×10) | Regression | 92.9 ms | **75.2 ms** |
-| Medium (2000×20) | Regression | **126.0 ms** | 353.1 ms |
-| 1000×15 | Binary Classification | **112.1 ms** | 190.7 ms |
+| Small (200×10) | Regression | 94.3 ms | **64.2 ms** |
+| Medium (2000×20) | Regression | **125.5 ms** | 320.2 ms |
+| 1000×15 | Binary Classification | **107.6 ms** | 178.5 ms |
 
 MichiBoost.jl shows excellent agreement with CatBoost, with high correlation and comparable or better accuracy. Performance is competitive on small datasets, while CatBoost's optimized C++ implementation is faster on larger datasets.
 
