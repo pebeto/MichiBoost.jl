@@ -65,9 +65,15 @@ function cb_classifier(X, y; loss="Logloss")
 end
 
 function mb_train(X, y; loss="RMSE")
-    MichiBoost.train(Pool(X; label=y);
-        iterations=ITERS, learning_rate=LR, depth=DEPTH,
-        loss_function=loss, random_seed=SEED, verbose=false)
+    m = if loss == "RMSE" || loss == "MAE"
+        MichiBoostRegressor(; iterations=ITERS, learning_rate=LR, depth=DEPTH,
+            loss_function=loss, random_seed=SEED, verbose=false)
+    else
+        MichiBoostClassifier(; iterations=ITERS, learning_rate=LR, depth=DEPTH,
+            loss_function=loss, random_seed=SEED, verbose=false)
+    end
+    fit!(m, X, y)
+    return m
 end
 
 @testset "CatBoost vs MichiBoost — Correctness" begin
@@ -77,7 +83,7 @@ end
         mb = mb_train(X, y)
 
         py_pred = pyconvert(Vector{Float64}, cb.predict(np.array(X)))
-        jl_pred = MichiBoost.predict(mb, Pool(X))
+        jl_pred = predict(mb, X)
 
         r = cor(py_pred, jl_pred)
         println("Regression correlation: r = $(round(r; digits=4))")
@@ -92,7 +98,7 @@ end
         mb = mb_train(X, y; loss="Logloss")
 
         py_prob = pyconvert(Matrix{Float64}, cb.predict_proba(np.array(X)))[:, 2]
-        jl_prob = MichiBoost.predict(mb, Pool(X))
+        jl_prob = predict(mb, X; prediction_type="Probability")
 
         r = cor(py_prob, jl_prob)
         agreement = mean((py_prob .>= 0.5) .== (jl_prob .>= 0.5))
@@ -110,7 +116,7 @@ end
         mb = mb_train(X, y; loss="MultiClass")
 
         py_prob = pyconvert(Matrix{Float64}, cb.predict_proba(np.array(X)))
-        jl_prob = MichiBoost.predict(mb, Pool(X))
+        jl_prob = predict(mb, X; prediction_type="Probability")
 
         py_cls = [argmax(py_prob[i, :]) for i in axes(py_prob, 1)]
         jl_cls = [argmax(jl_prob[i, :]) for i in axes(jl_prob, 1)]
@@ -141,11 +147,24 @@ for (label, task, X, y, loss) in [
     task in ("Binary", "Multiclass") && (cb_kwargs = merge(cb_kwargs, (loss_function=loss,)))
 
     t_cb = median(@benchmark($cb_fn(; $cb_kwargs...).fit($py_pool))).time / 1e6
-    t_mb = median(@benchmark(MichiBoost.train($jl_pool; iterations=$ITERS,
-        learning_rate=$LR, depth=$DEPTH, loss_function=$loss,
-        random_seed=$SEED, verbose=false))).time / 1e6
+    t_mb = median(@benchmark(fit!(
+        $loss in ("RMSE", "MAE") ?
+            MichiBoostRegressor(; iterations=$ITERS, learning_rate=$LR, depth=$DEPTH,
+                loss_function=$loss, random_seed=$SEED, verbose=false) :
+            MichiBoostClassifier(; iterations=$ITERS, learning_rate=$LR, depth=$DEPTH,
+                loss_function=$loss, random_seed=$SEED, verbose=false),
+        $jl_pool))).time / 1e6
 
     println("  Training:  CatBoost $(round(t_cb; digits=1)) ms  |  MichiBoost $(round(t_mb; digits=1)) ms")
+
+    cb_model = cb_fn(; cb_kwargs...).fit(py_pool)
+    mb_model = mb_train(X, y; loss)
+    py_X = np.array(X)
+
+    t_cb_pred = median(@benchmark($cb_model.predict($py_X))).time / 1e6
+    t_mb_pred = median(@benchmark(predict($mb_model, $X))).time / 1e6
+
+    println("  Inference: CatBoost $(round(t_cb_pred; digits=3)) ms  |  MichiBoost $(round(t_mb_pred; digits=3)) ms")
 end
 
 let
@@ -176,11 +195,20 @@ let
     cb_kwargs = (iterations=ITERS, learning_rate=LR, depth=DEPTH, random_seed=SEED,
                  verbose=false, loss_function="Logloss")
     t_cb = median(@benchmark(catboost.CatBoostClassifier(; $cb_kwargs...).fit($py_pool))).time / 1e6
-    t_mb = median(@benchmark(MichiBoost.train($jl_pool; iterations=$ITERS,
-        learning_rate=$LR, depth=$DEPTH, loss_function="Logloss",
-        random_seed=$SEED, verbose=false))).time / 1e6
+    t_mb = median(@benchmark(fit!(
+        MichiBoostClassifier(; iterations=$ITERS, learning_rate=$LR, depth=$DEPTH,
+            loss_function="Logloss", random_seed=$SEED, verbose=false),
+        $jl_pool))).time / 1e6
 
     println("  Training:  CatBoost $(round(t_cb; digits=1)) ms  |  MichiBoost $(round(t_mb; digits=1)) ms")
+
+    cb_model = catboost.CatBoostClassifier(; cb_kwargs...).fit(py_pool)
+    mb_model = mb_train(df, y; loss="Logloss")
+
+    t_cb_pred = median(@benchmark($cb_model.predict($py_df))).time / 1e6
+    t_mb_pred = median(@benchmark(predict($mb_model, $df))).time / 1e6
+
+    println("  Inference: CatBoost $(round(t_cb_pred; digits=3)) ms  |  MichiBoost $(round(t_mb_pred; digits=3)) ms")
 end
 
 println("\n", "="^60, "\n")
