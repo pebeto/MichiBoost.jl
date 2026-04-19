@@ -213,17 +213,43 @@ function _predict_raw(model::MichiBoostModel, pool::Pool)
     else
         Matrix{Float64}(undef, n, 0)
     end
+    n_trees = length(model.trees)
+    nt = Threads.nthreads()
 
     if model.is_multiclass
+        partials = [zeros(Float64, n, model.n_classes) for _ in 1:nt]
+        leaf_bufs = [Vector{Int}(undef, n) for _ in 1:nt]
+        Threads.@threads :static for k in 1:nt
+            lo = div((k - 1) * n_trees, nt) + 1
+            hi = div(k * n_trees, nt)
+            lbuf = leaf_bufs[k]
+            for i in lo:hi
+                predict_tree!(
+                    partials[k], model.trees[i], num_bins, cat_enc, model.learning_rate, lbuf
+                )
+            end
+        end
         preds = repeat(model.initial_pred', n, 1)
-        for tree in model.trees
-            preds .+= model.learning_rate .* predict_tree(tree, num_bins, cat_enc)
+        for t in 1:nt
+            preds .+= partials[t]
         end
         return preds
     else
+        partials = [zeros(Float64, n) for _ in 1:nt]
+        leaf_bufs = [Vector{Int}(undef, n) for _ in 1:nt]
+        Threads.@threads :static for k in 1:nt
+            lo = div((k - 1) * n_trees, nt) + 1
+            hi = div(k * n_trees, nt)
+            lbuf = leaf_bufs[k]
+            for i in lo:hi
+                predict_tree!(
+                    partials[k], model.trees[i], num_bins, cat_enc, model.learning_rate, lbuf
+                )
+            end
+        end
         preds = fill(model.initial_pred::Float64, n)
-        for tree in model.trees
-            preds .+= model.learning_rate .* predict_tree(tree, num_bins, cat_enc)
+        for t in 1:nt
+            preds .+= partials[t]
         end
         return preds
     end
