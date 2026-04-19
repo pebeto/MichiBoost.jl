@@ -18,15 +18,22 @@ include("data/encoding.jl")
 include("losses.jl")
 
 # Symmetric tree inference and construction
-include("trees/predict.jl")
-include("trees/shap.jl")
-include("trees/histograms.jl")
-include("trees/build.jl")
+include("trees/base/histograms.jl")
+include("trees/base/predict.jl")
+include("trees/base/shap.jl")
+include("trees/base/build.jl")
+include("trees/multiclass/histograms.jl")
+include("trees/multiclass/predict.jl")
+include("trees/multiclass/shap.jl")
+include("trees/multiclass/build.jl")
 
 # Core engine
 include("train.jl")
 include("predict.jl")
 include("io.jl")
+
+# Public SHAP dispatcher (depends on _prepare_features from predict.jl)
+include("trees/shap.jl")
 
 # User-facing API
 include("api.jl")

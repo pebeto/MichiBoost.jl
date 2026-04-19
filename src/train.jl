@@ -89,7 +89,7 @@ function train(
 
     # Initial predictions
     if is_multiclass
-        initial_pred = initial_prediction_multiclass(y_onehot, n_classes)
+        initial_pred = initial_prediction(lf, y_onehot)
         predictions = repeat(initial_pred', n_samples, 1)
     else
         initial_pred_val = initial_prediction(lf, y)
@@ -120,7 +120,7 @@ function train(
         if is_multiclass
             grads = negative_gradient(lf, y_onehot, predictions) .* reshape(weights, :, 1)
             hess = hessian(lf, y_onehot, predictions) .* reshape(weights, :, 1)
-            tree = build_symmetric_tree_multiclass(
+            tree = build_symmetric_tree(
                 grads,
                 hess,
                 qf.bins,
@@ -139,7 +139,7 @@ function train(
                 cat_sorted_vals,
             )
             push!(trees, tree)
-            predict_tree_mc!(predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices)
+            predict_tree!(predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices)
         else
             grads = negative_gradient(lf, y, predictions) .* weights
             hess = hessian(lf, y, predictions) .* weights
@@ -245,7 +245,7 @@ function _evaluate_loss(
     if is_multiclass
         preds = repeat(initial_pred', n, 1)
         for tree in trees
-            preds .+= lr .* predict_tree_multiclass(tree, num_bins, cat_enc)
+            preds .+= lr .* predict_tree(tree, num_bins, cat_enc)
         end
         class_labels = sort(unique(y))
         label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))

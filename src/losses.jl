@@ -57,7 +57,7 @@ function hessian(::MultiClassLoss, ::AbstractMatrix, pred::AbstractMatrix)
     return probs .* (1.0 .- probs)
 end
 
-function initial_prediction_multiclass(y_onehot::AbstractMatrix, n_classes::Int)
+function initial_prediction(::MultiClassLoss, y_onehot::AbstractMatrix)
     class_probs = clamp.(vec(mean(y_onehot; dims=1)), 1e-7, 1.0 - 1e-7)
     return log.(class_probs)
 end

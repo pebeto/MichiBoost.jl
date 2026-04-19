@@ -217,11 +217,7 @@ function _predict_raw(model::MichiBoostModel, pool::Pool)
     if model.is_multiclass
         preds = repeat(model.initial_pred', n, 1)
         for tree in model.trees
-            preds .+= model.learning_rate .* predict_tree_multiclass(
-                tree,
-                num_bins,
-                cat_enc,
-            )
+            preds .+= model.learning_rate .* predict_tree(tree, num_bins, cat_enc)
         end
         return preds
     else

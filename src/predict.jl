@@ -39,7 +39,7 @@ function predict(model::MichiBoostModel, pool::Pool)
             hi = div(k * n_trees, nt)
             lbuf = leaf_bufs[k]
             for i in lo:hi
-                predict_tree_mc!(
+                predict_tree!(
                     partials[k], model.trees[i], num_bins, cat_encoded, model.learning_rate, lbuf
                 )
             end
