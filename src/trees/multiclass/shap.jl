@@ -12,31 +12,13 @@ function _shap_tree!(
     cat_feat_indices::Vector{Int},
 )
     depth = tree.depth
-    n_leaves = 1 << depth
     n_classes = size(tree.leaf_values, 2)
+    path_prefix = 0
 
     for k in 1:depth
         bit_pos = depth - k
-        went_right = (leaf_idx >> bit_pos) & 1
-        mask = 1 << bit_pos
-
-        sum_left = zeros(Float64, n_classes)
-        sum_right = zeros(Float64, n_classes)
-        count_left = 0
-        count_right = 0
-        for leaf in 0:(n_leaves - 1)
-            if (leaf & mask) == 0
-                for c in 1:n_classes
-                    sum_left[c] += tree.leaf_values[leaf + 1, c]
-                end
-                count_left += 1
-            else
-                for c in 1:n_classes
-                    sum_right[c] += tree.leaf_values[leaf + 1, c]
-                end
-                count_right += 1
-            end
-        end
+        half = 1 << bit_pos
+        lo = path_prefix << (bit_pos + 1)
 
         feat_idx = tree.split_feature_indices[k]
         orig_col = if tree.split_feature_types[k] == :numerical
@@ -45,12 +27,18 @@ function _shap_tree!(
             cat_feat_indices[feat_idx]
         end
 
+        went_right = (leaf_idx >> bit_pos) & 1
+
         for c in 1:n_classes
-            mean_left = sum_left[c] / count_left
-            mean_right = sum_right[c] / count_right
+            sum_left  = sum(@view tree.leaf_values[lo+1      : lo+half,    c])
+            sum_right = sum(@view tree.leaf_values[lo+half+1 : lo+2*half,  c])
+            mean_left  = sum_left  / half
+            mean_right = sum_right / half
             contribution = lr * (went_right == 1 ? mean_right - mean_left : mean_left - mean_right) / 2.0
             shap_row[orig_col, c] += contribution
         end
+
+        path_prefix = (path_prefix << 1) | went_right
     end
     return nothing
 end

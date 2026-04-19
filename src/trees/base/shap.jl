@@ -14,36 +14,22 @@ function _shap_tree!(
     cat_feat_indices::Vector{Int},
 )
     depth = tree.depth
-    n_leaves = 1 << depth
+    path_prefix = 0  # tracks the 0-indexed first leaf of the current subtree
 
     for k in 1:depth
-        # Which bit position corresponds to level k?
-        # Level 1 is the most-significant bit (depth-1 shift), level depth is bit 0.
         bit_pos = depth - k
+        half = 1 << bit_pos                # leaves in each child subtree
+        lo = path_prefix << (bit_pos + 1)  # 0-indexed start of current subtree
+
+        # Path-conditioned means: average only over leaves reachable from here.
+        sum_left  = sum(@view tree.leaf_values[lo+1      : lo+half])
+        sum_right = sum(@view tree.leaf_values[lo+half+1 : lo+2*half])
+        mean_left  = sum_left  / half
+        mean_right = sum_right / half
+
         went_right = (leaf_idx >> bit_pos) & 1
-
-        # Mean leaf value over left subtree (bit_pos = 0) and right (bit_pos = 1).
-        # The mask for "right" leaves at this level: bit bit_pos is set.
-        mask = 1 << bit_pos
-        sum_left = 0.0
-        sum_right = 0.0
-        count_left = 0
-        count_right = 0
-        for leaf in 0:(n_leaves - 1)
-            if (leaf & mask) == 0
-                sum_left += tree.leaf_values[leaf + 1]
-                count_left += 1
-            else
-                sum_right += tree.leaf_values[leaf + 1]
-                count_right += 1
-            end
-        end
-        mean_left = sum_left / count_left
-        mean_right = sum_right / count_right
-
         contribution = lr * (went_right == 1 ? mean_right - mean_left : mean_left - mean_right) / 2.0
 
-        # Map the split feature index back to the original feature column.
         feat_idx = tree.split_feature_indices[k]
         orig_col = if tree.split_feature_types[k] == :numerical
             num_feat_indices[feat_idx]
@@ -51,6 +37,8 @@ function _shap_tree!(
             cat_feat_indices[feat_idx]
         end
         shap_row[orig_col] += contribution
+
+        path_prefix = (path_prefix << 1) | went_right
     end
     return nothing
 end
