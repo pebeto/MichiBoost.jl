@@ -79,6 +79,84 @@ struct SplitCandidate
     gain::Float64
 end
 
+struct SplitBuffers
+    hist_g::Matrix{Float64}          # (max_leaves × max_bins)
+    hist_h::Matrix{Float64}
+    hist_c::Matrix{Int}
+    total_g::Vector{Float64}         # (max_leaves,)
+    total_h::Vector{Float64}
+    total_n::Vector{Int}
+    left_g::Vector{Float64}
+    left_h::Vector{Float64}
+    left_c::Vector{Int}
+    indices::Vector{Int}
+    indices_tmp::Vector{Int}
+    # Leaf-local compact arrays for cache-friendly access
+    local_gradients::Vector{Float64}
+    local_hessians::Vector{Float64}
+    local_bins::Vector{UInt16}
+    local_cat_values::Vector{Float64}
+end
+
+function SplitBuffers(max_leaves::Int, max_bins::Int, n_samples::Int)
+    return SplitBuffers(
+        zeros(Float64, max_leaves, max_bins),
+        zeros(Float64, max_leaves, max_bins),
+        zeros(Int, max_leaves, max_bins),
+        zeros(Float64, max_leaves),
+        zeros(Float64, max_leaves),
+        zeros(Int, max_leaves),
+        zeros(Float64, max_leaves),
+        zeros(Float64, max_leaves),
+        zeros(Int, max_leaves),
+        zeros(Int, n_samples),
+        zeros(Int, n_samples),
+        zeros(Float64, n_samples),
+        zeros(Float64, n_samples),
+        zeros(UInt16, n_samples),
+        zeros(Float64, n_samples),
+    )
+end
+
+struct SplitBuffersMC
+    hist_g::Array{Float64,3}         # (max_leaves × max_bins × n_classes)
+    hist_h::Array{Float64,3}
+    hist_c::Matrix{Int}              # (max_leaves × max_bins)
+    total_g::Matrix{Float64}         # (max_leaves × n_classes)
+    total_h::Matrix{Float64}
+    total_n::Vector{Int}
+    left_g::Matrix{Float64}          # (max_leaves × n_classes)
+    left_h::Matrix{Float64}
+    left_c::Vector{Int}
+    indices::Vector{Int}
+    indices_tmp::Vector{Int}
+    # Leaf-local compact arrays for cache-friendly access
+    local_gradients_mc::Matrix{Float64}  # (n_samples × n_classes)
+    local_hessians_mc::Matrix{Float64}
+    local_bins::Vector{UInt16}
+    local_cat_values::Vector{Float64}
+end
+
+function SplitBuffersMC(max_leaves::Int, max_bins::Int, n_classes::Int, n_samples::Int)
+    return SplitBuffersMC(
+        zeros(Float64, max_leaves, max_bins, n_classes),
+        zeros(Float64, max_leaves, max_bins, n_classes),
+        zeros(Int, max_leaves, max_bins),
+        zeros(Float64, max_leaves, n_classes),
+        zeros(Float64, max_leaves, n_classes),
+        zeros(Int, max_leaves),
+        zeros(Float64, max_leaves, n_classes),
+        zeros(Float64, max_leaves, n_classes),
+        zeros(Int, max_leaves),
+        zeros(Int, n_samples),
+        zeros(Int, n_samples),
+        zeros(Float64, n_samples, n_classes),
+        zeros(Float64, n_samples, n_classes),
+        zeros(UInt16, n_samples),
+        zeros(Float64, n_samples),
+    )
+end
+
 """
     MichiBoostModel
 

@@ -35,6 +35,28 @@ end
     @test pool.weight == [1.0, 2.0, 1.0]
 end
 
+@testset "Sample weights are honored during training" begin
+    using Random
+    Random.seed!(42)
+    # Two classes with very different weights — the weighted model should
+    # predict differently from the unweighted one.
+    X = [0.0 1.0; 1.0 0.0; 2.0 0.0; 3.0 1.0; 4.0 0.0; 5.0 1.0]
+    y = [0.0, 0.0, 1.0, 1.0, 0.0, 1.0]
+    w = [10.0, 10.0, 1.0, 1.0, 10.0, 1.0]  # heavily upweight class-0 samples
+
+    pool_unweighted = Pool(X; label=y)
+    pool_weighted   = Pool(X; label=y, weight=w)
+
+    model_uw = MichiBoostClassifier(; iterations=20, depth=3, random_seed=1, verbose=false)
+    model_w  = MichiBoostClassifier(; iterations=20, depth=3, random_seed=1, verbose=false)
+    MichiBoost.fit!(model_uw, pool_unweighted)
+    MichiBoost.fit!(model_w,  pool_weighted)
+
+    preds_uw = MichiBoost.predict(model_uw, X; prediction_type="Probability")
+    preds_w  = MichiBoost.predict(model_w,  X; prediction_type="Probability")
+    @test preds_uw != preds_w
+end
+
 @testset "Pool slicing" begin
     tbl = (a=[1.0, 2.0, 3.0, 4.0], b=[5.0, 6.0, 7.0, 8.0])
     pool = Pool(tbl; label=[10.0, 20.0, 30.0, 40.0])

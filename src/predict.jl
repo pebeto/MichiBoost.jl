@@ -28,17 +28,43 @@ Most users should call `predict(wrapper_model, data)` instead.
 function predict(model::MichiBoostModel, pool::Pool)
     num_bins, cat_encoded = _prepare_features(model, pool)
     n = pool.n_samples
+    n_trees = length(model.trees)
+    nt = Threads.nthreads()
 
     if model.is_multiclass
+        partials = [zeros(Float64, n, model.n_classes) for _ in 1:nt]
+        leaf_bufs = [Vector{Int}(undef, n) for _ in 1:nt]
+        Threads.@threads :static for k in 1:nt
+            lo = div((k - 1) * n_trees, nt) + 1
+            hi = div(k * n_trees, nt)
+            lbuf = leaf_bufs[k]
+            for i in lo:hi
+                predict_tree_mc!(
+                    partials[k], model.trees[i], num_bins, cat_encoded, model.learning_rate, lbuf
+                )
+            end
+        end
         preds = repeat(model.initial_pred', n, 1)
-        for tree in model.trees
-            predict_tree_mc!(preds, tree, num_bins, cat_encoded, model.learning_rate)
+        for t in 1:nt
+            preds .+= partials[t]
         end
         return _softmax_matrix(preds)
     else
+        partials = [zeros(Float64, n) for _ in 1:nt]
+        leaf_bufs = [Vector{Int}(undef, n) for _ in 1:nt]
+        Threads.@threads :static for k in 1:nt
+            lo = div((k - 1) * n_trees, nt) + 1
+            hi = div(k * n_trees, nt)
+            lbuf = leaf_bufs[k]
+            for i in lo:hi
+                predict_tree!(
+                    partials[k], model.trees[i], num_bins, cat_encoded, model.learning_rate, lbuf
+                )
+            end
+        end
         preds = fill(model.initial_pred::Float64, n)
-        for tree in model.trees
-            predict_tree!(preds, tree, num_bins, cat_encoded, model.learning_rate)
+        for t in 1:nt
+            preds .+= partials[t]
         end
         return model.n_classes == 2 ? _sigmoid.(preds) : preds
     end

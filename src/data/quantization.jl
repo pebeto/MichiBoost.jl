@@ -27,8 +27,25 @@ end
 function apply_borders(numerical_data::Matrix{Float64}, borders::Vector{Vector{Float64}})
     n_samples, n_features = size(numerical_data)
     bins = Matrix{UInt16}(undef, n_samples, n_features)
-    for j in 1:n_features, i in 1:n_samples
-        bins[i, j] = _assign_bin(numerical_data[i, j], borders[j])
+    for j in 1:n_features
+        b = borders[j]
+        nb = length(b)
+        if nb <= 32
+            # Linear scan with early exit — faster than binary search for small
+            # border counts due to branch prediction and no function call overhead.
+            @inbounds for i in 1:n_samples
+                v = numerical_data[i, j]
+                lo = 1
+                while lo <= nb && v > b[lo]
+                    lo += 1
+                end
+                bins[i, j] = UInt16(lo)
+            end
+        else
+            @inbounds for i in 1:n_samples
+                bins[i, j] = UInt16(searchsortedfirst(b, numerical_data[i, j]))
+            end
+        end
     end
     return bins
 end

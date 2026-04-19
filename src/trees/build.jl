@@ -12,12 +12,19 @@ function build_symmetric_tree(
     min_data_in_leaf::Int=1,
     rsm::Float64=1.0,
     rng::AbstractRNG=MersenneTwister(),
+    buffers::Vector{SplitBuffers}=[
+        SplitBuffers(1 << depth, maximum(qf.n_bins; init=1) + 1, length(sample_indices))
+        for _ in 1:Threads.maxthreadid()
+    ],
+    cat_sorted_vals::Vector{Vector{Float64}}=Vector{Vector{Float64}}(),
 )
     n_features = n_num + n_cat
     n_sampled = max(1, round(Int, rsm * n_features))
 
     split_features, split_types, split_thresholds = Int[], Symbol[], Float64[]
-    leaf_groups = [sample_indices]
+    n = length(sample_indices)
+    copyto!(view(buffers[1].indices, 1:n), sample_indices)
+    leaf_groups = [view(buffers[1].indices, 1:n)]
 
     for _ in 1:depth
         sampled = randperm(rng, n_features)[1:n_sampled]
@@ -32,7 +39,9 @@ function build_symmetric_tree(
             leaf_groups,
             sampled_num,
             sampled_cat,
-            qf;
+            qf,
+            buffers,
+            cat_sorted_vals;
             l2_leaf_reg,
             min_data_in_leaf,
         )
@@ -45,12 +54,13 @@ function build_symmetric_tree(
             num_bins,
             cat_encoded,
             n_num,
+            buffers[1],
         )
     end
 
     n_leaves = 1 << depth
     leaf_values = Vector{Float64}(undef, n_leaves)
-    for l in 1:n_leaves
+    @inbounds for l in 1:n_leaves
         group = leaf_groups[l]
         if isempty(group)
             leaf_values[l] = 0.0
@@ -63,7 +73,6 @@ function build_symmetric_tree(
             leaf_values[l] = g_sum / (h_sum + l2_leaf_reg)
         end
     end
-
     return SymmetricTree(depth, split_features, split_types, split_thresholds, leaf_values)
 end
 
@@ -82,12 +91,19 @@ function build_symmetric_tree_multiclass(
     min_data_in_leaf::Int=1,
     rsm::Float64=1.0,
     rng::AbstractRNG=MersenneTwister(),
+    buffers::Vector{SplitBuffersMC}=[
+        SplitBuffersMC(1 << depth, maximum(qf.n_bins; init=1) + 1, n_classes, length(sample_indices))
+        for _ in 1:Threads.maxthreadid()
+    ],
+    cat_sorted_vals::Vector{Vector{Float64}}=Vector{Vector{Float64}}(),
 )
     n_features = n_num + n_cat
     n_sampled = max(1, round(Int, rsm * n_features))
 
     split_features, split_types, split_thresholds = Int[], Symbol[], Float64[]
-    leaf_groups = [sample_indices]
+    n = length(sample_indices)
+    copyto!(view(buffers[1].indices, 1:n), sample_indices)
+    leaf_groups = [view(buffers[1].indices, 1:n)]
 
     for _ in 1:depth
         sampled = randperm(rng, n_features)[1:n_sampled]
@@ -103,7 +119,9 @@ function build_symmetric_tree_multiclass(
             sampled_num,
             sampled_cat,
             qf,
-            n_classes;
+            n_classes,
+            buffers,
+            cat_sorted_vals;
             l2_leaf_reg,
             min_data_in_leaf,
         )
@@ -116,12 +134,13 @@ function build_symmetric_tree_multiclass(
             num_bins,
             cat_encoded,
             n_num,
+            buffers[1],
         )
     end
 
     n_leaves = 1 << depth
     leaf_values = Matrix{Float64}(undef, n_leaves, n_classes)
-    for l in 1:n_leaves
+    @inbounds for l in 1:n_leaves
         group = leaf_groups[l]
         if isempty(group)
             leaf_values[l, :] .= 0.0
@@ -136,14 +155,7 @@ function build_symmetric_tree_multiclass(
             end
         end
     end
-
-    return SymmetricTreeMultiClass(
-        depth,
-        split_features,
-        split_types,
-        split_thresholds,
-        leaf_values,
-    )
+    return SymmetricTreeMultiClass(depth, split_features, split_types, split_thresholds, leaf_values)
 end
 
 function _apply_split!(
@@ -155,15 +167,16 @@ function _apply_split!(
     num_bins,
     cat_encoded,
     n_num,
+    buf,
 )
     if best.feature_index == 0
         push!(split_features, 1)
         push!(split_types, n_num > 0 ? :numerical : :categorical)
         push!(split_thresholds, 0.0)
-        new_groups = Vector{Int}[]
-        for group in leaf_groups
-            push!(new_groups, group)
-            push!(new_groups, Int[])
+        new_groups = Vector{SubArray}(undef, 2 * length(leaf_groups))
+        for (li, group) in enumerate(leaf_groups)
+            new_groups[2 * li - 1] = group
+            new_groups[2 * li] = view(buf.indices, 1:0)
         end
         return new_groups
     end
@@ -172,18 +185,29 @@ function _apply_split!(
     push!(split_types, best.feature_type)
     push!(split_thresholds, best.threshold)
 
-    new_groups = Vector{Int}[]
-    for group in leaf_groups
-        left, right = Int[], Int[]
+    new_groups = Vector{Any}(undef, 2 * length(leaf_groups))
+    offset = 1
+    @inbounds for (li, group) in enumerate(leaf_groups)
+        n = length(group)
+        left_buf = view(buf.indices, offset:(offset + n - 1))
+        right_buf = view(buf.indices_tmp, offset:(offset + n - 1))
+        lc = 0
+        rc = 0
         for idx in group
             if _goes_right(best, num_bins, cat_encoded, idx)
-                push!(right, idx)
+                rc += 1
+                right_buf[rc] = idx
             else
-                push!(left, idx)
+                lc += 1
+                left_buf[lc] = idx
             end
         end
-        push!(new_groups, left)
-        push!(new_groups, right)
+        for i in 1:rc
+            buf.indices[offset + lc + i - 1] = right_buf[i]
+        end
+        new_groups[2 * li - 1] = view(buf.indices, offset:(offset + lc - 1))
+        new_groups[2 * li] = view(buf.indices, (offset + lc):(offset + n - 1))
+        offset += n
     end
     return new_groups
 end
@@ -194,228 +218,4 @@ end
     else
         return cat_encoded[idx, split.feature_index] > split.threshold
     end
-end
-
-function _find_best_split_across_leaves(
-    gradients,
-    hessians,
-    num_bins,
-    cat_encoded,
-    leaf_groups,
-    sampled_num::AbstractVector{Int},
-    sampled_cat::AbstractVector{Int},
-    qf;
-    l2_leaf_reg=3.0,
-    min_data_in_leaf=1,
-)
-    best = SplitCandidate(0, :numerical, 0.0, -Inf)
-
-    # Numerical features — build per-leaf histograms, then sweep
-    for j in sampled_num
-        nb = qf.n_bins[j]
-        if nb <= 1
-            continue
-        end
-
-        # Build one histogram per leaf
-        leaf_hists_g = [zeros(Float64, nb + 1) for _ in leaf_groups]
-        leaf_hists_h = [zeros(Float64, nb + 1) for _ in leaf_groups]
-        leaf_hists_c = [zeros(Int, nb + 1) for _ in leaf_groups]
-        leaf_total_g = zeros(Float64, length(leaf_groups))
-        leaf_total_h = zeros(Float64, length(leaf_groups))
-        leaf_total_n = zeros(Int, length(leaf_groups))
-
-        for (li, group) in enumerate(leaf_groups)
-            for idx in group
-                b = Int(num_bins[idx, j]) + 1
-                leaf_hists_g[li][b] += gradients[idx]
-                leaf_hists_h[li][b] += hessians[idx]
-                leaf_hists_c[li][b] += 1
-                leaf_total_g[li] += gradients[idx]
-                leaf_total_h[li] += hessians[idx]
-                leaf_total_n[li] += 1
-            end
-        end
-
-        # Sweep each bin threshold, summing gain across all leaves
-        # Initialize left accumulators with NaN bin (index 1)
-        left_g = [leaf_hists_g[li][1] for li in eachindex(leaf_groups)]
-        left_h = [leaf_hists_h[li][1] for li in eachindex(leaf_groups)]
-        left_c = [leaf_hists_c[li][1] for li in eachindex(leaf_groups)]
-
-        for b in 2:(nb + 1)
-            for li in eachindex(leaf_groups)
-                left_g[li] += leaf_hists_g[li][b]
-                left_h[li] += leaf_hists_h[li][b]
-                left_c[li] += leaf_hists_c[li][b]
-            end
-
-            gain = 0.0
-            for li in eachindex(leaf_groups)
-                lc = left_c[li]
-                rc = leaf_total_n[li] - lc
-                # Skip leaves that are empty or too small to split
-                if leaf_total_n[li] == 0
-                    continue
-                end
-                if lc < min_data_in_leaf || rc < min_data_in_leaf
-                    # This leaf can't be split at this threshold, but others might
-                    # Just add 0 gain for this leaf (no improvement)
-                    continue
-                end
-                rg = leaf_total_g[li] - left_g[li]
-                rh = leaf_total_h[li] - left_h[li]
-                gain += left_g[li]^2 / (left_h[li] + l2_leaf_reg) +
-                        rg^2 / (rh + l2_leaf_reg) -
-                        leaf_total_g[li]^2 / (leaf_total_h[li] + l2_leaf_reg)
-            end
-
-            if gain > best.gain
-                best = SplitCandidate(j, :numerical, Float64(b - 1), gain)
-            end
-        end
-    end
-
-    # Categorical features — collect all unique values, sweep
-    for j in sampled_cat
-        all_vals = Set{Float64}()
-        for group in leaf_groups, idx in group
-            push!(all_vals, cat_encoded[idx, j])
-        end
-        sorted_vals = sort(collect(all_vals))
-        if length(sorted_vals) <= 1
-            continue
-        end
-
-        for s in 1:(length(sorted_vals) - 1)
-            threshold = (sorted_vals[s] + sorted_vals[s + 1]) / 2.0
-            gain = 0.0
-            for group in leaf_groups
-                if isempty(group)
-                    continue
-                end
-                lg, lh, lc = 0.0, 0.0, 0
-                tg, th = 0.0, 0.0
-                for idx in group
-                    tg += gradients[idx]
-                    th += hessians[idx]
-                    if cat_encoded[idx, j] <= threshold
-                        lg += gradients[idx]
-                        lh += hessians[idx]
-                        lc += 1
-                    end
-                end
-                rc = length(group) - lc
-                if lc < min_data_in_leaf || rc < min_data_in_leaf
-                    continue
-                end
-                rg, rh = tg - lg, th - lh
-                gain += lg^2 / (lh + l2_leaf_reg) + rg^2 / (rh + l2_leaf_reg) -
-                        tg^2 / (th + l2_leaf_reg)
-            end
-            if gain > best.gain
-                best = SplitCandidate(j, :categorical, threshold, gain)
-            end
-        end
-    end
-
-    return best
-end
-
-function _find_best_split_across_leaves_mc(gradients, hessians, num_bins, cat_encoded,
-                                            leaf_groups, sampled_num::AbstractVector{Int},
-                                            sampled_cat::AbstractVector{Int}, qf, n_classes;
-                                            l2_leaf_reg=3.0, min_data_in_leaf=1)
-    best = SplitCandidate(0, :numerical, 0.0, -Inf)
-
-    for j in sampled_num
-        nb = qf.n_bins[j]
-        nb <= 1 && continue
-
-        n_leaves = length(leaf_groups)
-        leaf_hists_g = [zeros(Float64, nb + 1, n_classes) for _ in 1:n_leaves]
-        leaf_hists_h = [zeros(Float64, nb + 1, n_classes) for _ in 1:n_leaves]
-        leaf_hists_c = [zeros(Int, nb + 1) for _ in 1:n_leaves]
-        leaf_total_g = [zeros(Float64, n_classes) for _ in 1:n_leaves]
-        leaf_total_h = [zeros(Float64, n_classes) for _ in 1:n_leaves]
-        leaf_total_n = zeros(Int, n_leaves)
-
-        for (li, group) in enumerate(leaf_groups)
-            for idx in group
-                b = Int(num_bins[idx, j]) + 1
-                leaf_hists_c[li][b] += 1
-                leaf_total_n[li] += 1
-                for c in 1:n_classes
-                    leaf_hists_g[li][b, c] += gradients[idx, c]
-                    leaf_hists_h[li][b, c] += hessians[idx, c]
-                    leaf_total_g[li][c] += gradients[idx, c]
-                    leaf_total_h[li][c] += hessians[idx, c]
-                end
-            end
-        end
-
-        left_g = [leaf_hists_g[li][1, :] for li in 1:n_leaves]
-        left_h = [leaf_hists_h[li][1, :] for li in 1:n_leaves]
-        left_c = [leaf_hists_c[li][1] for li in 1:n_leaves]
-
-        for b in 2:(nb + 1)
-            for li in 1:n_leaves
-                left_c[li] += leaf_hists_c[li][b]
-                for c in 1:n_classes
-                    left_g[li][c] += leaf_hists_g[li][b, c]
-                    left_h[li][c] += leaf_hists_h[li][b, c]
-                end
-            end
-
-            gain = 0.0
-            for li in 1:n_leaves
-                leaf_total_n[li] == 0 && continue
-                lc = left_c[li]; rc = leaf_total_n[li] - lc
-                (lc < min_data_in_leaf || rc < min_data_in_leaf) && continue
-                for c in 1:n_classes
-                    rg = leaf_total_g[li][c] - left_g[li][c]
-                    rh = leaf_total_h[li][c] - left_h[li][c]
-                    gain += left_g[li][c]^2 / (left_h[li][c] + l2_leaf_reg) +
-                            rg^2 / (rh + l2_leaf_reg) -
-                            leaf_total_g[li][c]^2 / (leaf_total_h[li][c] + l2_leaf_reg)
-                end
-            end
-            gain > best.gain && (best = SplitCandidate(j, :numerical, Float64(b - 1), gain))
-        end
-    end
-
-    # Categorical features
-    for j in sampled_cat
-        all_vals = Set{Float64}()
-        for group in leaf_groups, idx in group; push!(all_vals, cat_encoded[idx, j]); end
-        sorted_vals = sort(collect(all_vals))
-        length(sorted_vals) <= 1 && continue
-
-        for s in 1:(length(sorted_vals) - 1)
-            threshold = (sorted_vals[s] + sorted_vals[s + 1]) / 2.0
-            gain = 0.0
-            for group in leaf_groups
-                isempty(group) && continue
-                lg = zeros(Float64, n_classes); lh = zeros(Float64, n_classes); lc = 0
-                tg = zeros(Float64, n_classes); th = zeros(Float64, n_classes)
-                for idx in group
-                    for c in 1:n_classes; tg[c] += gradients[idx, c]; th[c] += hessians[idx, c]; end
-                    if cat_encoded[idx, j] <= threshold
-                        lc += 1
-                        for c in 1:n_classes; lg[c] += gradients[idx, c]; lh[c] += hessians[idx, c]; end
-                    end
-                end
-                rc = length(group) - lc
-                (lc < min_data_in_leaf || rc < min_data_in_leaf) && continue
-                for c in 1:n_classes
-                    rg, rh = tg[c] - lg[c], th[c] - lh[c]
-                    gain += lg[c]^2 / (lh[c] + l2_leaf_reg) + rg^2 / (rh + l2_leaf_reg) -
-                            tg[c]^2 / (th[c] + l2_leaf_reg)
-                end
-            end
-            gain > best.gain && (best = SplitCandidate(j, :categorical, threshold, gain))
-        end
-    end
-
-    return best
 end

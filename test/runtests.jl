@@ -21,6 +21,7 @@ end
     include("api/feature_importance.jl")
     include("api/io.jl")
     include("api/cv.jl")
+    include("api/shap.jl")
 end
 
 Aqua.test_all(MichiBoost)

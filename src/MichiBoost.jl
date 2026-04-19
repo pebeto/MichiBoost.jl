@@ -19,6 +19,8 @@ include("losses.jl")
 
 # Symmetric tree inference and construction
 include("trees/predict.jl")
+include("trees/shap.jl")
+include("trees/histograms.jl")
 include("trees/build.jl")
 
 # Core engine
@@ -36,6 +38,7 @@ export feature_importance
 export fit!
 export load_model, save_model
 export predict, predict_classes, predict_proba
+export shap_values
 export slice
 
 end # module

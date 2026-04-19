@@ -100,10 +100,26 @@ function train(
     best_eval_loss, rounds_no_improve, best_iter = Inf, 0, 0
     sample_indices = collect(1:n_samples)
 
+    weights = pool.weight !== nothing ? pool.weight : ones(Float64, n_samples)
+
+    max_leaves = 1 << depth
+    # Categorical encoded values can have up to n_samples distinct values,
+    # so the buffer must accommodate both numerical bins and categorical ranks.
+    max_bins = max(border_count + 2, n_samples + 1)
+    nt = Threads.maxthreadid()
+    buffers = is_multiclass ?
+        [SplitBuffersMC(max_leaves, max_bins, n_classes, n_samples) for _ in 1:nt] :
+        [SplitBuffers(max_leaves, max_bins, n_samples) for _ in 1:nt]
+
+    # Pre-compute sorted unique encoded values per categorical feature — fixed for the run.
+    cat_sorted_vals = [sort(unique(cat_encoded[:, j])) for j in 1:n_cat]
+
+    leaf_indices = Vector{Int}(undef, n_samples)
+
     for iter in 1:iterations
         if is_multiclass
-            grads = negative_gradient(lf, y_onehot, predictions)
-            hess = hessian(lf, y_onehot, predictions)
+            grads = negative_gradient(lf, y_onehot, predictions) .* reshape(weights, :, 1)
+            hess = hessian(lf, y_onehot, predictions) .* reshape(weights, :, 1)
             tree = build_symmetric_tree_multiclass(
                 grads,
                 hess,
@@ -119,12 +135,14 @@ function train(
                 min_data_in_leaf,
                 rsm,
                 rng,
+                buffers=buffers::Vector{SplitBuffersMC},
+                cat_sorted_vals,
             )
             push!(trees, tree)
-            predict_tree_mc!(predictions, tree, qf.bins, cat_encoded, learning_rate)
+            predict_tree_mc!(predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices)
         else
-            grads = negative_gradient(lf, y, predictions)
-            hess = hessian(lf, y, predictions)
+            grads = negative_gradient(lf, y, predictions) .* weights
+            hess = hessian(lf, y, predictions) .* weights
             tree = build_symmetric_tree(
                 grads,
                 hess,
@@ -139,9 +157,11 @@ function train(
                 min_data_in_leaf,
                 rsm,
                 rng,
+                buffers=buffers::Vector{SplitBuffers},
+                cat_sorted_vals,
             )
             push!(trees, tree)
-            predict_tree!(predictions, tree, qf.bins, cat_encoded, learning_rate)
+            predict_tree!(predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices)
         end
 
         if verbose && (iter % max(1, iterations ÷ 10) == 0 || iter == 1 || iter == iterations)

@@ -251,6 +251,28 @@ function feature_importance(m::MichiBoostWrapper)
     return feature_importance(m.model)
 end
 
+"""
+    shap_values(model, data; cat_features=nothing) -> Array
+
+Compute SHAP feature attributions for each sample.
+
+- **Regression / Binary**: returns `Matrix{Float64}` of shape `(n_samples, n_features)`.
+- **Multiclass**: returns `Array{Float64,3}` of shape `(n_samples, n_features, n_classes)`.
+
+Each row sums approximately to `prediction - mean_prediction`.
+
+# Example
+```julia
+shap = shap_values(model, X_test)
+# shap[i, j] is the contribution of feature j to sample i's prediction
+```
+"""
+function shap_values(m::MichiBoostWrapper, data; cat_features=nothing)
+    m.model === nothing && error("Model has not been trained. Call fit! first.")
+    pool = data isa Pool ? data : Pool(data; cat_features)
+    return shap_values(m.model, pool)
+end
+
 # save / load
 
 """
