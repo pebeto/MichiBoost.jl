@@ -112,5 +112,5 @@ Both implementations use 4 threads. MichiBoost.jl shows strong performance on sm
 Run the validation yourself:
 
 ```bash
-julia --project=test/benchmark_project -t 4 test/benchmark_vs_catboost.jl
+julia --project=benchmark -t 4 benchmark/benchmark_vs_catboost.jl
 ```

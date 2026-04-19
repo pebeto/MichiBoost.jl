@@ -1,7 +1,7 @@
 # MichiBoost.jl vs CatBoost — Correctness & Performance
 #
 # Run with:
-#   julia --project=test/benchmark_project -t 4 test/benchmark_vs_catboost.jl
+#   julia --project=benchmark -t 4 benchmark/benchmark_vs_catboost.jl
 
 using BenchmarkTools
 using CatBoost
