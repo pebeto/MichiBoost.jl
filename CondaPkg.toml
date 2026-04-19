@@ -3,4 +3,3 @@
 [deps]
 catboost = ">=1.2.8"
 numpy = ""
-scikit-learn = ""

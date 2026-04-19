@@ -1,6 +1,9 @@
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CatBoost = "e2e10f9a-a85d-4fa9-b6b2-639a32100a12"
 CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+MLDatasets = "eb30cadb-4394-5ae3-aed4-317e484a6458"
 MichiBoost = "d4c3b8e2-7f5a-4b1e-9c6d-a2f8e3b0c1d4"
 PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
