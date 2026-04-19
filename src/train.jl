@@ -242,10 +242,16 @@ function _evaluate_loss(
     end
     y = get_label(eval_pool)
 
+    # Pre-allocate buffers to avoid per-tree allocations
+    leaf_indices = Vector{Int}(undef, n)
+
     if is_multiclass
         preds = repeat(initial_pred', n, 1)
+        tree_preds = zeros(Float64, n, n_classes)
         for tree in trees
-            preds .+= lr .* predict_tree(tree, num_bins, cat_enc)
+            fill!(tree_preds, 0.0)
+            predict_tree!(tree_preds, tree, num_bins, cat_enc, lr, leaf_indices)
+            preds .+= tree_preds
         end
         class_labels = sort(unique(y))
         label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
@@ -256,8 +262,11 @@ function _evaluate_loss(
         return loss(lf, y_oh, preds)
     else
         preds = fill(initial_pred, n)
+        tree_preds = zeros(Float64, n)
         for tree in trees
-            preds .+= lr .* predict_tree(tree, num_bins, cat_enc)
+            fill!(tree_preds, 0.0)
+            predict_tree!(tree_preds, tree, num_bins, cat_enc, lr, leaf_indices)
+            preds .+= tree_preds
         end
         return loss(lf, y, preds)
     end
