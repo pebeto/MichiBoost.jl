@@ -255,7 +255,8 @@ let
     mb_model = mb_train(jl_df_tr, y[tr]; loss="Logloss")
 
     # Pre-build inference pools outside benchmarks
-    cb_pool_te = CatBoost.Pool(data=py_df_te)
+    cat_names = ["cat$i" for i in 1:size(X_cat, 2)]
+    cb_pool_te = CatBoost.Pool(data=py_df_te, cat_features=cat_names)
 
     t_cb_pred = median(@benchmark(CatBoost.predict($cb_model, $cb_pool_te))).time / 1e6
     t_mb_pred = median(@benchmark(MichiBoost.predict($mb_model, $jl_df_te))).time / 1e6
