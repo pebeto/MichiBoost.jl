@@ -1,7 +1,12 @@
 # MichiBoost.jl vs CatBoost — Correctness & Performance
 #
-# Run with:
+# Run all (default):
 #   julia --project=benchmark -t 4 benchmark/benchmark_vs_catboost.jl
+#
+# Run only specific sections:
+#   julia --project=benchmark -t 4 benchmark/benchmark_vs_catboost.jl --cv
+#   julia --project=benchmark -t 4 benchmark/benchmark_vs_catboost.jl --es
+#   julia --project=benchmark -t 4 benchmark/benchmark_vs_catboost.jl --performance
 
 using BenchmarkTools
 using CatBoost
@@ -100,6 +105,13 @@ function make_cat_frames(X_num, X_cat, y)
     return py_df, jl_df, cb_pool, jl_pool
 end
 
+const HAS_FLAG = !isempty(ARGS) && any(a -> a in ("--performance", "--cv", "--es"), ARGS)
+const SHOW_CORRECTNESS = !HAS_FLAG
+const SHOW_PERFORMANCE = !HAS_FLAG
+const SHOW_CV = HAS_FLAG && "--cv" in ARGS
+const SHOW_ES = HAS_FLAG && "--es" in ARGS
+
+if SHOW_CORRECTNESS
 @testset "CatBoost vs MichiBoost — Correctness" begin
     @testset "Regression" begin
         X, y = regression_data(n=400, p=10)
@@ -177,90 +189,165 @@ end
         @test agreement > 0.6
     end
 end
-
-println("\n", "="^60)
-println("BENCHMARK: CatBoost.jl vs MichiBoost.jl")
-println("="^60)
-
-for (label, X, y, loss) in [
-    ("Small regression (200×10)",                     regression_data(n=200,  p=10)...,  "RMSE"),
-    ("MAE regression (200×10)",                       regression_data(n=200,  p=10)...,  "MAE"),
-    ("Medium regression (2000×20)",                   regression_data(n=2000, p=20)...,  "RMSE"),
-    ("Binary classification (1000×15)",               binary_data(n=1000,     p=15)...,  "Logloss"),
-    ("Multiclass classification (500×10, 3 classes)", multiclass_data(n=500,  p=10)...,  "MultiClass"),
-]
-    println("\n─── $label ───")
-    X_tr, y_tr, X_te, y_te = train_test_split(X, y)
-
-    is_reg = loss in ("RMSE", "MAE")
-
-    # Pre-build pools outside benchmarks
-    cb_pool_tr = CatBoost.Pool(data=np.array(X_tr), label=np.array(y_tr))
-    jl_pool_tr = MichiBoost.Pool(X_tr; label=y_tr)
-
-    # Build constructors outside so no ternary runs inside @benchmark
-    cb_model_fn = is_reg ?
-        () -> CatBoost.CatBoostRegressor(iterations=ITERS, learning_rate=LR, depth=DEPTH,
-                  random_seed=SEED, verbose=false, loss_function=loss, thread_count=N_THREADS) :
-        () -> CatBoost.CatBoostClassifier(iterations=ITERS, learning_rate=LR, depth=DEPTH,
-                  random_seed=SEED, verbose=false, loss_function=loss, thread_count=N_THREADS)
-    mb_model_fn = is_reg ?
-        () -> MichiBoostRegressor(; iterations=ITERS, learning_rate=LR, depth=DEPTH,
-                  loss_function=loss, random_seed=SEED, verbose=false) :
-        () -> MichiBoostClassifier(; iterations=ITERS, learning_rate=LR, depth=DEPTH,
-                  loss_function=loss, random_seed=SEED, verbose=false)
-
-    t_cb = median(@benchmark(CatBoost.fit!($cb_model_fn(), $cb_pool_tr))).time / 1e6
-    t_mb = median(@benchmark(MichiBoost.fit!($mb_model_fn(), $jl_pool_tr))).time / 1e6
-    println("  Training:  CatBoost $(round(t_cb; digits=1)) ms  |  MichiBoost $(round(t_mb; digits=1)) ms")
-
-    # Train final models for inference timing
-    cb_model = cb_train(X_tr, y_tr; loss)
-    mb_model = mb_train(X_tr, y_tr; loss)
-
-    # Pre-convert test data outside inference benchmarks
-    X_te_np = np.array(X_te)
-
-    t_cb_pred = median(@benchmark(CatBoost.predict($cb_model, $X_te_np))).time / 1e6
-    t_mb_pred = median(@benchmark(MichiBoost.predict($mb_model, $X_te))).time / 1e6
-    println("  Inference: CatBoost $(round(t_cb_pred; digits=3)) ms  |  MichiBoost $(round(t_mb_pred; digits=3)) ms")
 end
 
-let
-    println("\n─── Categorical features (1000×10, 5 cat + 5 num) ───")
-    X_num, X_cat, y = categorical_data()
-    rng = MersenneTwister(SEED)
-    idx = randperm(rng, length(y))
-    n_tr = round(Int, 0.8 * length(y))
-    tr, te = idx[1:n_tr], idx[n_tr+1:end]
-
-    py_df_tr, jl_df_tr, cb_pool_tr, jl_pool_tr =
-        make_cat_frames(X_num[tr, :], X_cat[tr, :], y[tr])
-    py_df_te, jl_df_te, _, _ =
-        make_cat_frames(X_num[te, :], X_cat[te, :], y[te])
-
-    cb_model_fn = () -> CatBoost.CatBoostClassifier(
-        iterations=ITERS, learning_rate=LR, depth=DEPTH,
-        random_seed=SEED, verbose=false, loss_function="Logloss",
-        thread_count=N_THREADS)
-    mb_model_fn = () -> MichiBoostClassifier(;
-        iterations=ITERS, learning_rate=LR, depth=DEPTH,
-        loss_function="Logloss", random_seed=SEED, verbose=false)
-
-    t_cb = median(@benchmark(CatBoost.fit!($cb_model_fn(), $cb_pool_tr))).time / 1e6
-    t_mb = median(@benchmark(MichiBoost.fit!($mb_model_fn(), $jl_pool_tr))).time / 1e6
-    println("  Training:  CatBoost $(round(t_cb; digits=1)) ms  |  MichiBoost $(round(t_mb; digits=1)) ms")
-
-    cb_model = cb_train(nothing, y[tr]; loss="Logloss", cb_pool=cb_pool_tr)
-    mb_model = mb_train(jl_df_tr, y[tr]; loss="Logloss")
-
-    # Pre-build inference pools outside benchmarks
-    cat_names = ["cat$i" for i in 1:size(X_cat, 2)]
-    cb_pool_te = CatBoost.Pool(data=py_df_te, cat_features=cat_names)
-
-    t_cb_pred = median(@benchmark(CatBoost.predict($cb_model, $cb_pool_te))).time / 1e6
-    t_mb_pred = median(@benchmark(MichiBoost.predict($mb_model, $jl_df_te))).time / 1e6
-    println("  Inference: CatBoost $(round(t_cb_pred; digits=3)) ms  |  MichiBoost $(round(t_mb_pred; digits=3)) ms")
+if SHOW_PERFORMANCE
+    println("\n", "="^60)
+    println("BENCHMARK: CatBoost.jl vs MichiBoost.jl")
+    println("="^60)
+    
+    for (label, X, y, loss) in [
+        ("Small regression (200×10)",                     regression_data(n=200,  p=10)...,  "RMSE"),
+        ("MAE regression (200×10)",                       regression_data(n=200,  p=10)...,  "MAE"),
+        ("Medium regression (2000×20)",                   regression_data(n=2000, p=20)...,  "RMSE"),
+        ("Binary classification (1000×15)",               binary_data(n=1000,     p=15)...,  "Logloss"),
+        ("Multiclass classification (500×10, 3 classes)", multiclass_data(n=500,  p=10)...,  "MultiClass"),
+    ]
+        println("\n─── $label ───")
+        X_tr, y_tr, X_te, y_te = train_test_split(X, y)
+    
+        is_reg = loss in ("RMSE", "MAE")
+    
+        # Pre-build pools outside benchmarks
+        cb_pool_tr = CatBoost.Pool(data=np.array(X_tr), label=np.array(y_tr))
+        jl_pool_tr = MichiBoost.Pool(X_tr; label=y_tr)
+    
+        # Build constructors outside so no ternary runs inside @benchmark
+        cb_model_fn = is_reg ?
+            () -> CatBoost.CatBoostRegressor(iterations=ITERS, learning_rate=LR, depth=DEPTH,
+                      random_seed=SEED, verbose=false, loss_function=loss, thread_count=N_THREADS) :
+            () -> CatBoost.CatBoostClassifier(iterations=ITERS, learning_rate=LR, depth=DEPTH,
+                      random_seed=SEED, verbose=false, loss_function=loss, thread_count=N_THREADS)
+        mb_model_fn = is_reg ?
+            () -> MichiBoostRegressor(; iterations=ITERS, learning_rate=LR, depth=DEPTH,
+                      loss_function=loss, random_seed=SEED, verbose=false) :
+            () -> MichiBoostClassifier(; iterations=ITERS, learning_rate=LR, depth=DEPTH,
+                      loss_function=loss, random_seed=SEED, verbose=false)
+    
+        t_cb = median(@benchmark(CatBoost.fit!($cb_model_fn(), $cb_pool_tr))).time / 1e6
+        t_mb = median(@benchmark(MichiBoost.fit!($mb_model_fn(), $jl_pool_tr))).time / 1e6
+        println("  Training:  CatBoost $(round(t_cb; digits=1)) ms  |  MichiBoost $(round(t_mb; digits=1)) ms")
+    
+        # Train final models for inference timing
+        cb_model = cb_train(X_tr, y_tr; loss)
+        mb_model = mb_train(X_tr, y_tr; loss)
+    
+        # Pre-convert test data outside inference benchmarks
+        X_te_np = np.array(X_te)
+    
+        t_cb_pred = median(@benchmark(CatBoost.predict($cb_model, $X_te_np))).time / 1e6
+        t_mb_pred = median(@benchmark(MichiBoost.predict($mb_model, $X_te))).time / 1e6
+        println("  Inference: CatBoost $(round(t_cb_pred; digits=3)) ms  |  MichiBoost $(round(t_mb_pred; digits=3)) ms")
+    end
+    
+    let
+        println("\n─── Categorical features (1000×10, 5 cat + 5 num) ───")
+        X_num, X_cat, y = categorical_data()
+        rng = MersenneTwister(SEED)
+        idx = randperm(rng, length(y))
+        n_tr = round(Int, 0.8 * length(y))
+        tr, te = idx[1:n_tr], idx[n_tr+1:end]
+    
+        py_df_tr, jl_df_tr, cb_pool_tr, jl_pool_tr =
+            make_cat_frames(X_num[tr, :], X_cat[tr, :], y[tr])
+        py_df_te, jl_df_te, _, _ =
+            make_cat_frames(X_num[te, :], X_cat[te, :], y[te])
+    
+        cb_model_fn = () -> CatBoost.CatBoostClassifier(
+            iterations=ITERS, learning_rate=LR, depth=DEPTH,
+            random_seed=SEED, verbose=false, loss_function="Logloss",
+            thread_count=N_THREADS)
+        mb_model_fn = () -> MichiBoostClassifier(;
+            iterations=ITERS, learning_rate=LR, depth=DEPTH,
+            loss_function="Logloss", random_seed=SEED, verbose=false)
+    
+        t_cb = median(@benchmark(CatBoost.fit!($cb_model_fn(), $cb_pool_tr))).time / 1e6
+        t_mb = median(@benchmark(MichiBoost.fit!($mb_model_fn(), $jl_pool_tr))).time / 1e6
+        println("  Training:  CatBoost $(round(t_cb; digits=1)) ms  |  MichiBoost $(round(t_mb; digits=1)) ms")
+    
+        cb_model = cb_train(nothing, y[tr]; loss="Logloss", cb_pool=cb_pool_tr)
+        mb_model = mb_train(jl_df_tr, y[tr]; loss="Logloss")
+    
+        # Pre-build inference pools outside benchmarks
+        cat_names = ["cat$i" for i in 1:size(X_cat, 2)]
+        cb_pool_te = CatBoost.Pool(data=py_df_te, cat_features=cat_names)
+    
+        t_cb_pred = median(@benchmark(CatBoost.predict($cb_model, $cb_pool_te))).time / 1e6
+        t_mb_pred = median(@benchmark(MichiBoost.predict($mb_model, $jl_df_te))).time / 1e6
+        println("  Inference: CatBoost $(round(t_cb_pred; digits=3)) ms  |  MichiBoost $(round(t_mb_pred; digits=3)) ms")
+    end
 end
 
-println("\n", "="^60, "\n")
+if SHOW_CV
+    println("\n", "="^60)
+    println("BENCHMARK: Cross-Validation")
+    println("="^60)
+    
+    for (label, X, y, loss) in [
+        ("Small regression (200×10)",                     regression_data(n=200,  p=10)...,  "RMSE"),
+        ("Binary classification (1000×15)",               binary_data(n=1000,     p=15)...,  "Logloss"),
+        ("Multiclass classification (500×10, 3 classes)", multiclass_data(n=500,  p=10)...,  "MultiClass"),
+    ]
+        println("\n─── $label ───")
+        X_tr, y_tr, _, _ = train_test_split(X, y)
+    
+        # CatBoost CV
+        cb_pool = CatBoost.Pool(data=np.array(X_tr), label=np.array(y_tr))
+        cb_params = PyDict(Dict("iterations" => ITERS, "depth" => DEPTH,
+                                "loss_function" => loss, "logging_level" => "Silent"))
+        t_cb_cv = median(@benchmark(CatBoost.cv($cb_pool, params=$cb_params, fold_count=5))).time / 1e6
+    
+        # MichiBoost CV
+        jl_pool = MichiBoost.Pool(X_tr; label=y_tr)
+        mb_params = Dict("iterations" => ITERS, "depth" => DEPTH, "loss_function" => loss)
+        t_mb_cv = median(@benchmark(MichiBoost.cv($jl_pool, params=$mb_params, fold_count=5))).time / 1e6
+    
+        println("  CV:          CatBoost $(round(t_cb_cv; digits=1)) ms  |  MichiBoost $(round(t_mb_cv; digits=1)) ms")
+    end
+end
+
+if SHOW_ES
+    println("\n", "="^60)
+    println("BENCHMARK: Early Stopping")
+    println("="^60)
+    
+    ES_ITERS = 200
+    ES_STOP = 20
+    
+    for (label, X, y, loss) in [
+        ("Small regression (200×10)",                     regression_data(n=200,  p=10)...,  "RMSE"),
+        ("Binary classification (1000×15)",               binary_data(n=1000,     p=15)...,  "Logloss"),
+        ("Multiclass classification (500×10, 3 classes)", multiclass_data(n=500,  p=10)...,  "MultiClass"),
+    ]
+        println("\n─── $label ───")
+        X_tr, y_tr, X_te, y_te = train_test_split(X, y)
+    
+        # CatBoost with eval_set
+        cb_pool_tr = CatBoost.Pool(data=np.array(X_tr), label=np.array(y_tr))
+        cb_pool_te = CatBoost.Pool(data=np.array(X_te), label=np.array(y_te))
+        cb_model_fn = () -> (loss in ("RMSE", "MAE") ?
+            CatBoost.CatBoostRegressor(iterations=ES_ITERS, learning_rate=LR, depth=DEPTH,
+                        random_seed=SEED, verbose=false, loss_function=loss, thread_count=N_THREADS) :
+            CatBoost.CatBoostClassifier(iterations=ES_ITERS, learning_rate=LR, depth=DEPTH,
+                        random_seed=SEED, verbose=false, loss_function=loss, thread_count=N_THREADS))
+        t_cb_es = median(@benchmark(CatBoost.fit!($cb_model_fn(), $cb_pool_tr, eval_set=$cb_pool_te,
+                        early_stopping_rounds=$ES_STOP))).time / 1e6
+    
+        # MichiBoost with eval_pool
+        jl_pool_tr = MichiBoost.Pool(X_tr; label=y_tr)
+        jl_pool_te = MichiBoost.Pool(X_te; label=y_te)
+        mb_model_fn = () -> (loss in ("RMSE", "MAE") ?
+            MichiBoostRegressor(; iterations=ES_ITERS, learning_rate=LR, depth=DEPTH,
+                        loss_function=loss, random_seed=SEED, verbose=false) :
+            MichiBoostClassifier(; iterations=ES_ITERS, learning_rate=LR, depth=DEPTH,
+                        loss_function=loss, random_seed=SEED, verbose=false))
+        t_mb_es = median(@benchmark(MichiBoost.fit!($mb_model_fn(), $jl_pool_tr, eval_pool=$jl_pool_te,
+                        early_stopping_rounds=$ES_STOP))).time / 1e6
+    
+        println("  Early stop:  CatBoost $(round(t_cb_es; digits=1)) ms  |  MichiBoost $(round(t_mb_es; digits=1)) ms")
+    end
+end
+
+if SHOW_CORRECTNESS || SHOW_PERFORMANCE || SHOW_CV || SHOW_ES
+    println("\n", "="^60, "\n")
+end
