@@ -16,9 +16,19 @@ _Michi (ミチ) means cat in Japanese._
 - **Histogram-based split finding** with quantile-based feature binning and pre-allocated buffers
 - **Fast inference** — beats CatBoost on small regression, multiclass, and categorical workloads
 - Regression (RMSE, MAE), binary classification (Logloss), and multi-class (Softmax)
+- **SHAP values** for feature-level explanation of individual predictions
+- **Sample weights** — pass per-row importance via `Pool(...; weight=...)`
 - Cross-validation, early stopping, RSM feature subsampling, model serialization
 
 ## Quick Start
+
+Run with threading enabled for best performance:
+
+```bash
+julia -t 4   # or any thread count
+```
+
+This sets `Threads.nthreads()` which MichiBoost uses during training.
 
 ### Regression
 
@@ -72,6 +82,24 @@ scores = cv(pool; fold_count=5, params=Dict("iterations" => 100, "depth" => 4))
 println("Mean test loss: ", scores.mean_test_loss)
 ```
 
+### SHAP Values
+
+Explain individual predictions with SHAP values:
+
+```julia
+shap = shap_values(model, X)   # shape: (n_samples, n_features)
+```
+
+### Sample Weights
+
+Weight individual training samples via `Pool`:
+
+```julia
+w = [1.0, 2.0, 0.5, 1.0]
+pool = Pool(X; label=y, weight=w)
+fit!(model, pool)
+```
+
 ## Validation Against CatBoost
 
 MichiBoost.jl has been validated against the reference CatBoost implementation (Python wrapper). The benchmark compares both implementations on identical datasets with the same hyperparameters (100 iterations, depth=6, learning_rate=0.03). All correctness metrics are **out-of-sample** (80/20 train/test split).
@@ -107,7 +135,7 @@ Training uses the train split; inference is measured on the held-out test split.
 | 500×10 (3 classes)      | Multiclass            | 129.3 ms          | **112.8 ms**        | 0.173 ms           | **0.029 ms**         |
 | 1000×10 (5 cat + 5 num) | Categorical           | **89.4 ms**       | 113.0 ms            | 0.524 ms           | **0.172 ms**         |
 
-Both implementations use 4 threads. MichiBoost.jl shows strong performance on small-to-medium datasets: training is 2–3× faster on small regression and competitive on binary/multiclass tasks, while inference consistently beats CatBoost across all workloads (CatBoost's Python call overhead is significant for small batches).
+Both implementations use 4 threads. MichiBoost.jl shows strong performance on small-to-medium datasets: training is 2–3× faster on small regression and competitive on binary/multiclass tasks, while inference consistently beats CatBoost across all workloads. Because both implementations run natively in Julia (CatBoost via CatBoost.jl), these gains come from algorithmic and implementation differences rather than Python call overhead.
 
 Run the validation yourself:
 
