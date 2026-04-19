@@ -100,12 +100,12 @@ Training uses the train split; inference is measured on the held-out test split.
 
 | Dataset                 | Task                  | CatBoost Training | MichiBoost Training | CatBoost Inference | MichiBoost Inference |
 | ----------------------- | --------------------- | ----------------- | ------------------- | ------------------ | -------------------- |
-| Small (200×10)          | Regression (RMSE)     | 73.8 ms           | **27.2 ms**         | 0.213 ms           | **0.010 ms**         |
-| Small (200×10)          | Regression (MAE)      | 76.3 ms           | **26.9 ms**         | 0.210 ms           | **0.010 ms**         |
-| Medium (2000×20)        | Regression            | **117.4 ms**      | 167.2 ms            | **0.286 ms**       | **0.165 ms**         |
-| 1000×15                 | Binary Classification | **106.4 ms**      | **88.2 ms**         | 0.198 ms           | **0.040 ms**         |
-| 500×10 (3 classes)      | Multiclass            | 129.9 ms          | **111.4 ms**        | 0.174 ms           | **0.036 ms**         |
-| 1000×10 (5 cat + 5 num) | Categorical           | **87.4 ms**       | 113.5 ms            | **0.518 ms**       | **0.172 ms**         |
+| Small (200×10)          | Regression (RMSE)     | 69.4 ms           | **24.7 ms**         | 0.211 ms           | **0.010 ms**         |
+| Small (200×10)          | Regression (MAE)      | 75.5 ms           | **26.5 ms**         | 0.213 ms           | **0.015 ms**         |
+| Medium (2000×20)        | Regression            | **129.3 ms**      | 175.9 ms            | 0.283 ms           | **0.076 ms**         |
+| 1000×15                 | Binary Classification | 97.9 ms           | **86.3 ms**         | 0.196 ms           | **0.037 ms**         |
+| 500×10 (3 classes)      | Multiclass            | 127.0 ms          | **117.3 ms**        | 0.174 ms           | **0.034 ms**         |
+| 1000×10 (5 cat + 5 num) | Categorical           | **88.1 ms**       | 116.2 ms            | 0.518 ms           | **0.174 ms**         |
 
 Both implementations use 4 threads. MichiBoost.jl shows strong performance on small-to-medium datasets: training is 2–3× faster on small regression and multiclass, and inference beats CatBoost across all synthetic workloads (CatBoost's Python call overhead is significant for small batches).
 
