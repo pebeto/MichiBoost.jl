@@ -1,7 +1,7 @@
 name = "MichiBoost"
 uuid = "d4c3b8e2-7f5a-4b1e-9c6d-a2f8e3b0c1d4"
 authors = ["Jose Esparza <joseesparzadc@gmail.com>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
