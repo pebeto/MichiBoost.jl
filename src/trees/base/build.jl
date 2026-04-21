@@ -76,27 +76,39 @@ function build_symmetric_tree(
         if isempty(group)
             leaf_values[l] = 0.0
         elseif refine
-            n_leaf = length(group)
-            local_vals = Vector{Float64}(undef, n_leaf)
-            local_ws   = Vector{Float64}(undef, n_leaf)
-            @inbounds for j in 1:n_leaf
-                idx = group[j]
-                local_vals[j] = leaf_refine_values[idx]
-                local_ws[j]   = leaf_refine_weights === nothing ? 1.0 : leaf_refine_weights[idx]
-            end
-            leaf_values[l] = weighted_median(local_vals, local_ws)
+            leaf_values[l] = _leaf_value_refine(group, leaf_refine_values, leaf_refine_weights)
         else
-            g_sum, h_sum = 0.0, 0.0
-            n_leaf = length(group)
-            @inbounds for j in 1:n_leaf
-                idx = group[j]
-                g_sum += gradients[idx]
-                h_sum += hessians[idx]
-            end
-            leaf_values[l] = g_sum / (h_sum + l2_leaf_reg)
+            leaf_values[l] = _leaf_value_newton(group, gradients, hessians, l2_leaf_reg)
         end
     end
     return SymmetricTree(depth, split_features, split_types, split_thresholds, leaf_values)
+end
+
+# Function-barrier helpers: keep g_sum / h_sum as plain locals rather than
+# letting the @threads closure box them as Core.Box (which happens when the
+# arithmetic sits inline inside the threaded body).
+@inline function _leaf_value_newton(group, gradients, hessians, l2_leaf_reg)
+    g_sum = 0.0
+    h_sum = 0.0
+    n_leaf = length(group)
+    @inbounds for j in 1:n_leaf
+        idx = group[j]
+        g_sum += gradients[idx]
+        h_sum += hessians[idx]
+    end
+    return g_sum / (h_sum + l2_leaf_reg)
+end
+
+@inline function _leaf_value_refine(group, leaf_refine_values, leaf_refine_weights)
+    n_leaf = length(group)
+    local_vals = Vector{Float64}(undef, n_leaf)
+    local_ws   = Vector{Float64}(undef, n_leaf)
+    @inbounds for j in 1:n_leaf
+        idx = group[j]
+        local_vals[j] = leaf_refine_values[idx]
+        local_ws[j]   = leaf_refine_weights === nothing ? 1.0 : leaf_refine_weights[idx]
+    end
+    return weighted_median(local_vals, local_ws)
 end
 
 # Shared utility used by both build_symmetric_tree and build_symmetric_tree_multiclass

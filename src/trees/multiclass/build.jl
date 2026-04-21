@@ -75,17 +75,28 @@ function build_symmetric_tree(
                 leaf_values[l, c] = 0.0
             end
         else
-            n_leaf = length(group)
-            @inbounds for c in 1:n_classes
-                g_sum, h_sum = 0.0, 0.0
-                for k in 1:n_leaf
-                    idx = group[k]
-                    g_sum += gradients[idx, c]
-                    h_sum += hessians[idx, c]
-                end
-                leaf_values[l, c] = g_sum / (h_sum + l2_leaf_reg)
-            end
+            _fill_leaf_values_mc!(leaf_values, l, group, gradients, hessians, n_classes, l2_leaf_reg)
         end
     end
     return SymmetricTreeMultiClass(depth, split_features, split_types, split_thresholds, leaf_values)
+end
+
+# Function-barrier helper for the multiclass Newton step: without this, the
+# @threads closure captures g_sum / h_sum in a Core.Box and every `+=`
+# allocates a fresh boxed Float64 — up to ~1.1M per boosting round.
+@inline function _fill_leaf_values_mc!(
+    leaf_values, l, group, gradients, hessians, n_classes, l2_leaf_reg,
+)
+    n_leaf = length(group)
+    @inbounds for c in 1:n_classes
+        g_sum = 0.0
+        h_sum = 0.0
+        for k in 1:n_leaf
+            idx = group[k]
+            g_sum += gradients[idx, c]
+            h_sum += hessians[idx, c]
+        end
+        leaf_values[l, c] = g_sum / (h_sum + l2_leaf_reg)
+    end
+    return nothing
 end

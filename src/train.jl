@@ -120,6 +120,42 @@ function train(
 
     leaf_indices = Vector{Int}(undef, n_samples)
 
+    # Early-stopping eval state — set up once, updated incrementally each
+    # round so the ES check is O(1) per iteration instead of O(T).  The
+    # original _evaluate_loss re-predicted all trees on every call, which
+    # made ES O(T²) across a run.
+    es_active = early_stopping_rounds !== nothing && eval_pool !== nothing
+    eval_num_bins = Matrix{UInt16}(undef, 0, 0)
+    eval_cat_enc  = Matrix{Float64}(undef, 0, 0)
+    eval_preds_vec = Float64[]
+    eval_preds_mat = Matrix{Float64}(undef, 0, 0)
+    eval_y_vec = Float64[]
+    eval_y_onehot = Matrix{Float64}(undef, 0, 0)
+    eval_leaf_indices = Int[]
+    if es_active
+        n_eval = eval_pool.n_samples
+        eval_num_bins = n_numerical(eval_pool) > 0 ?
+            apply_borders(eval_pool.features_numerical, qf.borders) :
+            Matrix{UInt16}(undef, n_eval, 0)
+        eval_cat_enc = n_categorical(eval_pool) > 0 && encoder !== nothing ?
+            encode_categorical(encoder, eval_pool.features_categorical) :
+            Matrix{Float64}(undef, n_eval, 0)
+        eval_leaf_indices = Vector{Int}(undef, n_eval)
+        eval_y_raw = get_label(eval_pool)
+        if is_multiclass
+            eval_preds_mat = repeat(initial_pred', n_eval, 1)
+            es_class_labels = sort(unique(eval_y_raw))
+            es_label_map = Dict(es_class_labels[i] => i for i in eachindex(es_class_labels))
+            eval_y_onehot = zeros(Float64, n_eval, n_classes)
+            for i in 1:n_eval
+                eval_y_onehot[i, es_label_map[eval_y_raw[i]]] = 1.0
+            end
+        else
+            eval_preds_vec = fill(initial_pred_val, n_eval)
+            eval_y_vec = eval_y_raw
+        end
+    end
+
     # Buffers reused across every boosting round — without this the loop
     # allocates an O(n × n_classes) matrix (or O(n) vector) 4-6 times per
     # iteration for gradient / hessian / softmax temporaries, which on
@@ -206,18 +242,18 @@ function train(
             println("Iteration $iter/$iterations, train loss: $(round(train_loss; digits=6))")
         end
 
-        if early_stopping_rounds !== nothing && eval_pool !== nothing
-            eval_loss = _evaluate_loss(
-                eval_pool,
-                trees,
-                learning_rate,
-                is_multiclass ? initial_pred : initial_pred_val,
-                lf,
-                encoder,
-                qf.borders,
-                is_multiclass,
-                n_classes,
-            )
+        if es_active
+            # Extend the running eval predictions with the just-built tree
+            # so we only pay O(1) tree-prediction per ES check.
+            if is_multiclass
+                predict_tree!(eval_preds_mat, tree, eval_num_bins, eval_cat_enc,
+                              learning_rate, eval_leaf_indices)
+                eval_loss = loss(lf, eval_y_onehot, eval_preds_mat)
+            else
+                predict_tree!(eval_preds_vec, tree, eval_num_bins, eval_cat_enc,
+                              learning_rate, eval_leaf_indices)
+                eval_loss = loss(lf, eval_y_vec, eval_preds_vec)
+            end
             if eval_loss < best_eval_loss
                 best_eval_loss = eval_loss
                 best_iter = iter
@@ -251,47 +287,3 @@ function train(
     )
 end
 
-function _evaluate_loss(
-    eval_pool,
-    trees,
-    lr,
-    initial_pred,
-    lf,
-    encoder,
-    borders,
-    is_multiclass,
-    n_classes,
-)
-    n = eval_pool.n_samples
-    num_bins = if n_numerical(eval_pool) > 0
-        apply_borders(eval_pool.features_numerical, borders)
-    else
-        Matrix{UInt16}(undef, n, 0)
-    end
-    cat_enc = if n_categorical(eval_pool) > 0 && encoder !== nothing
-        encode_categorical(encoder, eval_pool.features_categorical)
-    else
-        Matrix{Float64}(undef, n, 0)
-    end
-    y = get_label(eval_pool)
-
-    if is_multiclass
-        preds = repeat(initial_pred', n, 1)
-        for tree in trees
-            preds .+= lr .* predict_tree_multiclass(tree, num_bins, cat_enc)
-        end
-        class_labels = sort(unique(y))
-        label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
-        y_oh = zeros(Float64, n, n_classes)
-        for i in 1:n
-            y_oh[i, label_map[y[i]]] = 1.0
-        end
-        return loss(lf, y_oh, preds)
-    else
-        preds = fill(initial_pred, n)
-        for tree in trees
-            preds .+= lr .* predict_tree(tree, num_bins, cat_enc)
-        end
-        return loss(lf, y, preds)
-    end
-end

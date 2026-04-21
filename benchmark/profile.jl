@@ -123,6 +123,31 @@ else
         @printf "  %10.2f  %12d  %s\n" (b/1024^2) c t
     end
     @printf "\n  (multiply by ~1000 to estimate totals at full sample rate)\n"
+
+    # Dump top user-code call sites for each of the top-3 allocating types,
+    # so we can see WHERE the boxing happens rather than only WHAT is boxed.
+    function user_frame(st)
+        for fr in st
+            f = string(fr.file)
+            occursin("MichiBoost", f) && return "$(basename(f)):$(fr.line) $(fr.func)"
+        end
+        st_frame = first(st)
+        return "$(basename(string(st_frame.file))):$(st_frame.line) $(st_frame.func)"
+    end
+
+    for (type_name, _) in first(sorted, 3)
+        println("\n  ── top call sites allocating ", type_name, " ──")
+        by_site = Dict{String,Int}()
+        for a in results.allocs
+            string(a.type) == type_name || continue
+            key = user_frame(a.stacktrace)
+            by_site[key] = get(by_site, key, 0) + 1
+        end
+        top = sort(collect(by_site); by = x -> -x[2])
+        for (site, c) in first(top, 8)
+            @printf "    %8d  %s\n" c site
+        end
+    end
 end
 
 println()
