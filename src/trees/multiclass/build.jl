@@ -18,6 +18,7 @@ function build_symmetric_tree(
         for _ in 1:Threads.maxthreadid()
     ],
     cat_sorted_vals::Vector{Vector{Float64}}=Vector{Vector{Float64}}(),
+    hist_cache::HistCacheMC=HistCacheMC(1 << depth, qf.n_bins, cat_sorted_vals, n_classes),
 )
     n_features = n_num + n_cat
     n_sampled = max(1, round(Int, rsm * n_features))
@@ -26,6 +27,8 @@ function build_symmetric_tree(
     n = length(sample_indices)
     copyto!(view(buffers[1].indices, 1:n), sample_indices)
     leaf_groups = [view(buffers[1].indices, 1:n)]
+
+    reset_hist_cache!(hist_cache)
 
     for _ in 1:depth
         sampled = randperm(rng, n_features)[1:n_sampled]
@@ -43,7 +46,8 @@ function build_symmetric_tree(
             qf,
             n_classes,
             buffers,
-            cat_sorted_vals;
+            cat_sorted_vals,
+            hist_cache;
             l2_leaf_reg,
             min_data_in_leaf,
         )
@@ -58,18 +62,24 @@ function build_symmetric_tree(
             n_num,
             buffers[1],
         )
+        rotate_hist_cache!(hist_cache)
     end
 
     n_leaves = 1 << depth
     leaf_values = Matrix{Float64}(undef, n_leaves, n_classes)
-    @inbounds for l in 1:n_leaves
+    # Each thread writes to a disjoint row of leaf_values.
+    Threads.@threads :static for l in 1:n_leaves
         group = leaf_groups[l]
         if isempty(group)
-            leaf_values[l, :] .= 0.0
+            @inbounds for c in 1:n_classes
+                leaf_values[l, c] = 0.0
+            end
         else
-            for c in 1:n_classes
+            n_leaf = length(group)
+            @inbounds for c in 1:n_classes
                 g_sum, h_sum = 0.0, 0.0
-                for idx in group
+                for k in 1:n_leaf
+                    idx = group[k]
                     g_sum += gradients[idx, c]
                     h_sum += hessians[idx, c]
                 end

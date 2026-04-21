@@ -32,7 +32,7 @@ include("train.jl")
 include("predict.jl")
 include("io.jl")
 
-# Public SHAP dispatcher (depends on _prepare_features from predict.jl)
+# SHAP dispatcher (depends on _prepare_features from predict.jl)
 include("trees/shap.jl")
 
 # User-facing API

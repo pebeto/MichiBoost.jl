@@ -114,15 +114,36 @@ function train(
     # Pre-compute sorted unique encoded values per categorical feature — fixed for the run.
     cat_sorted_vals = [sort(unique(cat_encoded[:, j])) for j in 1:n_cat]
 
+    hist_cache = is_multiclass ?
+        HistCacheMC(max_leaves, qf.n_bins, cat_sorted_vals, n_classes) :
+        HistCache(max_leaves, qf.n_bins, cat_sorted_vals)
+
     leaf_indices = Vector{Int}(undef, n_samples)
+
+    # Buffers reused across every boosting round — without this the loop
+    # allocates an O(n × n_classes) matrix (or O(n) vector) 4-6 times per
+    # iteration for gradient / hessian / softmax temporaries, which on
+    # n=40k × k=7 adds up to ~100 MB / iter.
+    grads_buf = is_multiclass ?
+        Matrix{Float64}(undef, n_samples, n_classes) :
+        Vector{Float64}(undef, n_samples)
+    hess_buf = is_multiclass ?
+        Matrix{Float64}(undef, n_samples, n_classes) :
+        Vector{Float64}(undef, n_samples)
+    scratch_buf = is_multiclass ?
+        Matrix{Float64}(undef, n_samples, n_classes) :
+        Vector{Float64}(undef, n_samples)
+    use_refine = lf isa MAELoss
+    refine_buf = use_refine ? Vector{Float64}(undef, n_samples) : Float64[]
 
     for iter in 1:iterations
         if is_multiclass
-            grads = negative_gradient(lf, y_onehot, predictions) .* reshape(weights, :, 1)
-            hess = hessian(lf, y_onehot, predictions) .* reshape(weights, :, 1)
+            gradient_hessian!(grads_buf, hess_buf, lf, y_onehot, predictions, scratch_buf)
+            @. grads_buf *= weights
+            @. hess_buf  *= weights
             tree = build_symmetric_tree(
-                grads,
-                hess,
+                grads_buf,
+                hess_buf,
                 qf.bins,
                 cat_encoded,
                 sample_indices,
@@ -137,15 +158,24 @@ function train(
                 rng,
                 buffers=buffers::Vector{SplitBuffersMC},
                 cat_sorted_vals,
+                hist_cache=hist_cache::HistCacheMC,
             )
             push!(trees, tree)
             predict_tree!(predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices)
         else
-            grads = negative_gradient(lf, y, predictions) .* weights
-            hess = hessian(lf, y, predictions) .* weights
+            gradient_hessian!(grads_buf, hess_buf, lf, y, predictions, scratch_buf)
+            @. grads_buf *= weights
+            @. hess_buf  *= weights
+            # MAE is non-smooth: surrogate gradients (±1) drive split-finding,
+            # but leaf values must come from the residual weighted median —
+            # otherwise each round can shift predictions by at most
+            # learning_rate × 1, causing severe underfitting.
+            if use_refine
+                @. refine_buf = y - predictions
+            end
             tree = build_symmetric_tree(
-                grads,
-                hess,
+                grads_buf,
+                hess_buf,
                 qf.bins,
                 cat_encoded,
                 sample_indices,
@@ -159,6 +189,9 @@ function train(
                 rng,
                 buffers=buffers::Vector{SplitBuffers},
                 cat_sorted_vals,
+                hist_cache=hist_cache::HistCache,
+                leaf_refine_values  = use_refine ? refine_buf : nothing,
+                leaf_refine_weights = use_refine ? weights    : nothing,
             )
             push!(trees, tree)
             predict_tree!(predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices)
@@ -242,16 +275,10 @@ function _evaluate_loss(
     end
     y = get_label(eval_pool)
 
-    # Pre-allocate buffers to avoid per-tree allocations
-    leaf_indices = Vector{Int}(undef, n)
-
     if is_multiclass
         preds = repeat(initial_pred', n, 1)
-        tree_preds = zeros(Float64, n, n_classes)
         for tree in trees
-            fill!(tree_preds, 0.0)
-            predict_tree!(tree_preds, tree, num_bins, cat_enc, lr, leaf_indices)
-            preds .+= tree_preds
+            preds .+= lr .* predict_tree_multiclass(tree, num_bins, cat_enc)
         end
         class_labels = sort(unique(y))
         label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
@@ -262,11 +289,8 @@ function _evaluate_loss(
         return loss(lf, y_oh, preds)
     else
         preds = fill(initial_pred, n)
-        tree_preds = zeros(Float64, n)
         for tree in trees
-            fill!(tree_preds, 0.0)
-            predict_tree!(tree_preds, tree, num_bins, cat_enc, lr, leaf_indices)
-            preds .+= tree_preds
+            preds .+= lr .* predict_tree(tree, num_bins, cat_enc)
         end
         return loss(lf, y, preds)
     end
