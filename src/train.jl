@@ -111,8 +111,12 @@ function train(
         [SplitBuffersMC(max_leaves, max_bins, n_classes, n_samples) for _ in 1:nt] :
         [SplitBuffers(max_leaves, max_bins, n_samples) for _ in 1:nt]
 
-    # Pre-compute sorted unique encoded values per categorical feature — fixed for the run.
-    cat_sorted_vals = [sort(unique(cat_encoded[:, j])) for j in 1:n_cat]
+    # Cut points per categorical feature — at low raw cardinality ordered
+    # target statistics produce up to n_samples distinct encoded values, which
+    # would make per-iteration histogram work O(n_samples).  Capping at
+    # border_count+1 matches how numerical features are handled and keeps the
+    # per-feature bin count bounded regardless of raw cardinality.
+    cat_sorted_vals = [_quantile_cut_points(view(cat_encoded, :, j), border_count + 1) for j in 1:n_cat]
 
     hist_cache = is_multiclass ?
         HistCacheMC(max_leaves, qf.n_bins, cat_sorted_vals, n_classes) :

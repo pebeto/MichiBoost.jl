@@ -106,10 +106,6 @@ Total runtime varies with hardware; on a modern 4-core laptop expect ~20-30 minu
 
 The tables below will be populated after running the suite. Re-run locally to reproduce; numbers are machine-dependent (CPU, memory bandwidth, thread count, BLAS, CatBoost version).
 
-_Latest run:_ _(pending)_
-_Hardware:_ _(pending)_
-_Threads:_ _(pending)_
-
 ### Correctness
 
 | Task                              | Metric   | MichiBoost | CatBoost |       Δ |
@@ -126,57 +122,57 @@ _Threads:_ _(pending)_
 |                                   | Accuracy |     0.8033 |   0.8067 | -0.0033 |
 | Multiclass k=10, n=4000×15        | LogLoss  |     0.4152 |   0.5644 | -0.1492 |
 |                                   | Accuracy |     0.8990 |   0.8690 | +0.0300 |
-| Categorical (cardinality=20)      | LogLoss  |     0.6943 |   0.6931 | +0.0013 |
-|                                   | AUC      |     0.5080 |   0.5186 | -0.0106 |
-|                                   | Accuracy |     0.5062 |   0.5175 | -0.0112 |
+| Categorical (cardinality=20)      | LogLoss  |     0.6965 |   0.6931 | +0.0035 |
+|                                   | AUC      |     0.4954 |   0.5186 | -0.0233 |
+|                                   | Accuracy |     0.4925 |   0.5175 | -0.0250 |
 
 ### Speed sweep
 
-100 iterations, depth 6, learning_rate 0.03, single thread. Columns report training wall-clock time; `n` is the training subset size.
+100 iterations, depth 6, learning_rate 0.03, **4 threads**. Columns report training wall-clock time; `n` is the training subset size.
 
 **Training: Regression (RMSE)**
 
 |     n |  p | CatBoost | MichiBoost |    Ratio |
 | ----: | -: | -------: | ---------: | -------: |
-|   500 | 10 |  151.5ms |     58.5ms | MB 2.59× |
-|  2000 | 20 |  274.2ms |    157.0ms | MB 1.75× |
-| 10000 | 50 |  714.8ms |    646.1ms | MB 1.11× |
-| 50000 | 50 | 1349.7ms |   1941.9ms | CB 1.44× |
+|   500 | 10 |   82.7ms |     24.0ms | MB 3.45× |
+|  2000 | 20 |  114.7ms |     58.6ms | MB 1.96× |
+| 10000 | 50 |  259.9ms |    208.5ms | MB 1.25× |
+| 50000 | 50 |  434.7ms |    668.5ms | CB 1.54× |
 
 **Training: Binary classification (Logloss)**
 
 |     n |  p | CatBoost | MichiBoost |    Ratio |
 | ----: | -: | -------: | ---------: | -------: |
-|   500 | 10 |  156.2ms |     57.7ms | MB 2.71× |
-|  2000 | 20 |  297.7ms |    153.5ms | MB 1.94× |
-| 10000 | 50 |  780.3ms |    672.5ms | MB 1.16× |
-| 50000 | 50 | 1518.4ms |   2077.4ms | CB 1.37× |
+|   500 | 10 |   88.8ms |     23.4ms | MB 3.79× |
+|  2000 | 20 |  124.0ms |     61.6ms | MB 2.01× |
+| 10000 | 50 |  307.8ms |    220.8ms | MB 1.39× |
+| 50000 | 50 |  532.5ms |    710.6ms | CB 1.33× |
 
 **Training: Multiclass (3 classes)**
 
 |     n |  p | CatBoost | MichiBoost |    Ratio |
 | ----: | -: | -------: | ---------: | -------: |
-|   500 | 10 |  292.9ms |    213.0ms | MB 1.38× |
-|  2000 | 20 |  566.2ms |    555.6ms | MB 1.02× |
-| 10000 | 50 | 1665.1ms |   2375.7ms | CB 1.43× |
-| 50000 | 50 | 3140.8ms |   7322.6ms | CB 2.33× |
+|   500 | 10 |  126.2ms |     82.6ms | MB 1.53× |
+|  2000 | 20 |  215.0ms |    157.9ms | MB 1.36× |
+| 10000 | 50 |  548.0ms |    719.0ms | CB 1.31× |
+| 50000 | 50 |  953.4ms |   2547.2ms | CB 2.67× |
 
 **Training: Categorical (n=5000, 5 categorical + 5 numerical features)**
 
 | Cardinality | CatBoost | MichiBoost |    Ratio |
 | ----------: | -------: | ---------: | -------: |
-|           5 |  231.2ms |   1405.1ms | CB 6.08× |
-|          50 |  208.7ms |    719.8ms | CB 3.45× |
-|         500 |  208.3ms |    177.5ms | MB 1.17× |
+|           5 |  126.5ms |    135.2ms | CB 1.07× |
+|          50 |  120.9ms |    133.5ms | CB 1.10× |
+|         500 |  122.0ms |     83.3ms | MB 1.46× |
 
 **Inference: batch-size sweep (regression, n_train=10000, p=20)**
 
 | Batch | CatBoost | MichiBoost |     Ratio |
 | ----: | -------: | ---------: | --------: |
-|     1 |  0.232ms |    0.009ms | MB 27.23× |
-|   100 |  0.248ms |    0.029ms |  MB 8.59× |
-|  1000 |  0.364ms |    0.691ms |  CB 1.90× |
-| 10000 |  0.978ms |    7.028ms |  CB 7.19× |
+|     1 |  0.223ms |    0.008ms | MB 28.45× |
+|   100 |  0.246ms |    0.025ms |  MB 9.68× |
+|  1000 |  0.354ms |    0.080ms |  MB 4.44× |
+| 10000 |  0.996ms |    2.055ms |  CB 2.06× |
 
 ### Scaling (Covertype)
 
@@ -184,37 +180,39 @@ Covertype subset: 50,000 samples (40k train / 10k test), 54 features, 7 classes.
 
 **Training time and self-speedup**
 
-| Threads | MichiBoost | MB speedup vs 1t | CatBoost | CB speedup vs 1t |     Ratio |
-| ------: | ---------: | ---------------: | -------: | ---------------: | --------: |
-|       1 |    7590.7ms |            1.00× | 1831.2ms |            1.00× |  CB 4.15× |
-|       2 |    4388.3ms |            1.73× | 1008.5ms |            1.82× |  CB 4.35× |
-|       4 |    2962.2ms |            2.56× |  615.5ms |            2.98× |  CB 4.81× |
-|       8 |    2133.4ms |            3.56× |  521.7ms |            3.51× |  CB 4.09× |
+| Threads | MichiBoost | MB speedup vs 1t | CatBoost | CB speedup vs 1t |    Ratio |
+| ------: | ---------: | ---------------: | -------: | ---------------: | -------: |
+|       1 |    7597.0ms |            1.00× | 1774.4ms |            1.00× | CB 4.28× |
+|       2 |    4293.0ms |            1.77× |  959.5ms |            1.85× | CB 4.47× |
+|       4 |    2682.8ms |            2.83× |  597.3ms |            2.97× | CB 4.49× |
+|       8 |    2062.5ms |            3.68× |  502.0ms |            3.54× | CB 4.11× |
 
 **Inference time (median ms)**
 
 | Threads | MichiBoost | CatBoost |
 | ------: | ---------: | -------: |
-|       1 |      8.128 |    2.489 |
-|       2 |      7.040 |    2.512 |
-|       4 |      6.209 |    2.515 |
-|       8 |      6.298 |    2.484 |
+|       1 |      8.020 |    2.482 |
+|       2 |      7.215 |    2.453 |
+|       4 |      6.543 |    2.466 |
+|       8 |      5.433 |    2.482 |
 
 ### Feature costs
 
 Fixture: `n_train=1600`, `n_features=20`, default hyperparameters (100 iters, depth 6, learning_rate 0.03).
 
+4 threads. Fixture: `n_train=1600`, `n_features=20`, default hyperparameters (100 iters, depth 6, learning_rate 0.03).
+
 | Feature                           | CatBoost | MichiBoost |    Ratio |
 | --------------------------------- | -------: | ---------: | -------: |
-| Cross-validation (5-fold, RMSE)   |  973.1ms |    677.5ms | MB 1.44× |
-| Cross-validation (5-fold, LogLoss)| 1221.3ms |    698.0ms | MB 1.75× |
-| Early stopping (max 200, pat=20)  |  502.6ms |    270.9ms | MB 1.86× |
-| SHAP values (n_te=400)            |   14.0ms |     10.0ms | MB 1.41× |
+| Cross-validation (5-fold, RMSE)   | 1107.4ms |    251.2ms | MB 4.41× |
+| Cross-validation (5-fold, LogLoss)| 1281.3ms |    243.1ms | MB 5.27× |
+| Early stopping (max 200, pat=20)  |  206.0ms |     90.1ms | MB 2.29× |
+| SHAP values (n_te=400)            |   12.9ms |      2.9ms | MB 4.51× |
 
 | Internal toggle (MichiBoost only) | Baseline | Variant |      Δ |
 | --------------------------------- | -------: | ------: | -----: |
-| RSM: rsm=1.0 → rsm=0.5             |  139.9ms |  74.7ms | −46.6% |
-| Sample weights: none → uniform     |  138.6ms | 140.8ms |  +1.6% |
+| RSM: rsm=1.0 → rsm=0.5             |   45.2ms |  30.1ms | −33.5% |
+| Sample weights: none → uniform     |   46.4ms |  45.9ms |  −1.2% |
 
 Save/load: `save` 0.1ms, `load` 0.2ms (Julia `Serialization`).
 

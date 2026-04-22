@@ -12,9 +12,9 @@ _Michi (ミチ) means cat in Japanese._
 
 - **Pure Julia** — no Python, no C++ bindings, no CondaPkg
 - **Ordered target encoding** for native categorical feature handling without preprocessing
-- **Symmetric (oblivious) trees** as the base learner — strong regularization and fast inference
+- **Symmetric (oblivious) trees** as the base learner
 - **Histogram-based split finding** with quantile-based feature binning and pre-allocated buffers
-- **Fast inference** — beats CatBoost on small regression, multiclass, and categorical workloads
+- **Low-overhead inference** for single rows and small batches (see [benchmark results](benchmark/README.md))
 - Regression (RMSE, MAE), binary classification (Logloss), and multi-class (Softmax)
 - **SHAP values** for feature-level explanation of individual predictions
 - **Sample weights** — pass per-row importance via `Pool(...; weight=...)`
@@ -102,43 +102,6 @@ fit!(model, pool)
 
 ## Validation Against CatBoost
 
-MichiBoost.jl has been validated against the reference CatBoost implementation (Python wrapper). The benchmark compares both implementations on identical datasets with the same hyperparameters (100 iterations, depth=6, learning_rate=0.03). All correctness metrics are **out-of-sample** (80/20 train/test split).
+MichiBoost.jl is benchmarked against the reference CatBoost implementation (via [CatBoost.jl](https://github.com/beacon-biosignals/CatBoost.jl)) across four axes: correctness on held-out data, a training/inference speed sweep, threading and real-dataset scaling (UCI Covertype), and the cost of each advertised feature (CV, early stopping, SHAP, RSM, sample weights, save/load).
 
-### Correctness
-
-| Task                      | Metric                  | Result    |
-| ------------------------- | ----------------------- | --------- |
-| **Regression**            | Prediction correlation  | r = 0.98  |
-|                           | RMSE (CatBoost)         | 2.07      |
-|                           | RMSE (MichiBoost)       | 2.04      |
-| **Binary Classification** | Probability correlation | r = 0.97  |
-|                           | Class agreement         | 92.5%     |
-|                           | Accuracy (CatBoost)     | 77.5%     |
-|                           | Accuracy (MichiBoost)   | 77.5%     |
-| **Multi-class**           | Class agreement         | 75.8%     |
-|                           | Accuracy (CatBoost)     | 57.5%     |
-|                           | Accuracy (MichiBoost)   | 66.7%     |
-| **Categorical**           | Class agreement         | 63.5%     |
-|                           | Accuracy (CatBoost)     | 51.5%     |
-|                           | Accuracy (MichiBoost)   | 48.0%     |
-
-### Performance
-
-Training uses the train split; inference is measured on the held-out test split.
-
-| Dataset                 | Task                  | CatBoost Training | MichiBoost Training | CatBoost Inference | MichiBoost Inference |
-| ----------------------- | --------------------- | ----------------- | ------------------- | ------------------ | -------------------- |
-| Small (200×10)          | Regression (RMSE)     | 72.7 ms           | **24.3 ms**         | 0.212 ms           | **0.010 ms**         |
-| Small (200×10)          | Regression (MAE)      | 73.5 ms           | **24.5 ms**         | 0.210 ms           | **0.010 ms**         |
-| Medium (2000×20)        | Regression            | **121.6 ms**      | 166.4 ms            | 0.284 ms           | **0.069 ms**         |
-| 1000×15                 | Binary Classification | 94.7 ms           | **86.7 ms**         | 0.200 ms           | **0.036 ms**         |
-| 500×10 (3 classes)      | Multiclass            | 129.3 ms          | **112.8 ms**        | 0.173 ms           | **0.029 ms**         |
-| 1000×10 (5 cat + 5 num) | Categorical           | **89.4 ms**       | 113.0 ms            | 0.524 ms           | **0.172 ms**         |
-
-Both implementations use 4 threads. MichiBoost.jl shows strong performance on small-to-medium datasets: training is 2–3× faster on small regression and competitive on binary/multiclass tasks, while inference consistently beats CatBoost across all workloads. Because both implementations run natively in Julia (CatBoost via CatBoost.jl), these gains come from algorithmic and implementation differences rather than Python call overhead.
-
-Run the validation yourself:
-
-```bash
-julia --project=benchmark -t 4 benchmark/benchmark_vs_catboost.jl
-```
+See [`benchmark/README.md`](benchmark/README.md) for the full methodology, per-script commands, latest results, and caveats.

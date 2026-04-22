@@ -213,46 +213,73 @@ function _predict_raw(model::MichiBoostModel, pool::Pool)
     else
         Matrix{Float64}(undef, n, 0)
     end
-    n_trees = length(model.trees)
+    trees = model.trees
+    lr = model.learning_rate
     nt = Threads.nthreads()
 
+    # Row-chunk parallelism: each thread owns a disjoint slice of rows and
+    # runs *all* trees against it.  Writes into view(preds, rows) are
+    # naturally non-overlapping, so no partials buffers and no final reduction
+    # are needed — unlike tree-parallelism, which allocated nt × n partials
+    # per call and then summed them serially.  For tiny batches we skip the
+    # fork entirely; the overhead isn't worth it.
     if model.is_multiclass
-        partials = [zeros(Float64, n, model.n_classes) for _ in 1:nt]
-        leaf_bufs = [Vector{Int}(undef, n) for _ in 1:nt]
-        Threads.@threads :static for k in 1:nt
-            lo = div((k - 1) * n_trees, nt) + 1
-            hi = div(k * n_trees, nt)
-            lbuf = leaf_bufs[k]
-            for i in lo:hi
-                predict_tree!(
-                    partials[k], model.trees[i], num_bins, cat_enc, model.learning_rate, lbuf
-                )
-            end
-        end
         preds = repeat(model.initial_pred', n, 1)
-        for t in 1:nt
-            preds .+= partials[t]
+        if n < 1024 || nt == 1
+            leaf_buf = Vector{Int}(undef, n)
+            for tree in trees
+                predict_tree!(preds, tree, num_bins, cat_enc, lr, leaf_buf)
+            end
+        else
+            Threads.@threads :static for k in 1:nt
+                lo = div((k - 1) * n, nt) + 1
+                hi = div(k * n, nt)
+                _predict_chunk_mc!(preds, trees, num_bins, cat_enc, lr, lo, hi)
+            end
         end
         return preds
     else
-        partials = [zeros(Float64, n) for _ in 1:nt]
-        leaf_bufs = [Vector{Int}(undef, n) for _ in 1:nt]
-        Threads.@threads :static for k in 1:nt
-            lo = div((k - 1) * n_trees, nt) + 1
-            hi = div(k * n_trees, nt)
-            lbuf = leaf_bufs[k]
-            for i in lo:hi
-                predict_tree!(
-                    partials[k], model.trees[i], num_bins, cat_enc, model.learning_rate, lbuf
-                )
-            end
-        end
         preds = fill(model.initial_pred::Float64, n)
-        for t in 1:nt
-            preds .+= partials[t]
+        if n < 1024 || nt == 1
+            leaf_buf = Vector{Int}(undef, n)
+            for tree in trees
+                predict_tree!(preds, tree, num_bins, cat_enc, lr, leaf_buf)
+            end
+        else
+            Threads.@threads :static for k in 1:nt
+                lo = div((k - 1) * n, nt) + 1
+                hi = div(k * n, nt)
+                _predict_chunk!(preds, trees, num_bins, cat_enc, lr, lo, hi)
+            end
         end
         return preds
     end
+end
+
+# Function-barrier helpers so the threaded body specialises on concrete
+# types and keeps leaf_buf off the heap of the outer closure.
+@inline function _predict_chunk!(preds, trees, num_bins, cat_enc, lr, lo, hi)
+    chunk = hi - lo + 1
+    leaf_buf = Vector{Int}(undef, chunk)
+    pv   = view(preds,    lo:hi)
+    nbv  = view(num_bins, lo:hi, :)
+    cev  = view(cat_enc,  lo:hi, :)
+    for tree in trees
+        predict_tree!(pv, tree, nbv, cev, lr, leaf_buf)
+    end
+    return nothing
+end
+
+@inline function _predict_chunk_mc!(preds, trees, num_bins, cat_enc, lr, lo, hi)
+    chunk = hi - lo + 1
+    leaf_buf = Vector{Int}(undef, chunk)
+    pv   = view(preds,    lo:hi, :)
+    nbv  = view(num_bins, lo:hi, :)
+    cev  = view(cat_enc,  lo:hi, :)
+    for tree in trees
+        predict_tree!(pv, tree, nbv, cev, lr, leaf_buf)
+    end
+    return nothing
 end
 
 """
