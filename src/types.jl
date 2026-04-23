@@ -19,7 +19,8 @@ Stores numerical features as a `Float64` matrix, categorical features as
 integer-encoded vectors, labels, sample weights, and feature metadata.
 String columns are automatically detected as categorical.
 
-Construct with `Pool(data; label, cat_features, ...)`.
+Construct via the `Pool` constructor with keyword arguments for `label`,
+`cat_features`, `weight`, etc.
 
 # Fields
 - `n_samples::Int` — number of rows
@@ -323,12 +324,11 @@ end
 """
     MichiBoostModel
 
-The fitted model produced by `train` (or stored inside a
-`MichiBoostRegressor` / `MichiBoostClassifier` after
-`fit!`).  Contains the tree ensemble and everything needed for
-prediction.
+The fitted model stored inside a `MichiBoostRegressor` /
+`MichiBoostClassifier` after `fit!`.  Contains the tree ensemble and
+everything needed for prediction.
 
-Not typically constructed directly — use `fit!` or `train` instead.
+Not typically constructed directly — use `fit!` instead.
 """
 mutable struct MichiBoostModel
     trees::Union{Vector{SymmetricTree},Vector{SymmetricTreeMultiClass}}

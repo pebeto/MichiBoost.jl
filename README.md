@@ -77,6 +77,12 @@ predict(model, df)
 ### Cross-Validation
 
 ```julia
+using MichiBoost, Random
+
+Random.seed!(42)
+X = randn(100, 5)
+y = Float64.(X[:, 1] .+ X[:, 2] .> 0)
+
 pool = Pool(X; label=y)
 scores = cv(pool; fold_count=5, params=Dict("iterations" => 100, "depth" => 4))
 println("Mean test loss: ", scores.mean_test_loss)
@@ -84,19 +90,25 @@ println("Mean test loss: ", scores.mean_test_loss)
 
 ### SHAP Values
 
-Explain individual predictions with SHAP values:
+Explain individual predictions with SHAP values. Given a trained `model` and
+feature matrix `X`:
 
 ```julia
-shap = shap_values(model, X)   # shape: (n_samples, n_features)
+shap = shap_values(model, X)
+# Regression / binary classification: (n_samples, n_features) matrix.
+# Multi-class:                        (n_samples, n_features, n_classes) array.
 ```
 
 ### Sample Weights
 
-Weight individual training samples via `Pool`:
+Weight individual training samples via `Pool`. Reusing `X` and `y` from the
+binary classification example above:
 
 ```julia
 w = [1.0, 2.0, 0.5, 1.0]
 pool = Pool(X; label=y, weight=w)
+
+model = MichiBoostClassifier(; iterations=100)
 fit!(model, pool)
 ```
 
