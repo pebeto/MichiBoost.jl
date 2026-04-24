@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Classification · MichiBoost.jl</title><meta name="title" content="Classification · MichiBoost.jl"/><meta property="og:title" content="Classification · MichiBoost.jl"/><meta property="twitter:title" content="Classification · MichiBoost.jl"/><meta name="description" content="Documentation for MichiBoost.jl."/><meta property="og:description" content="Documentation for MichiBoost.jl."/><meta property="twitter:description" content="Documentation for MichiBoost.jl."/><meta property="og:url" content="https://pebeto.github.io/MichiBoost.jl/guide/classification/"/><meta property="twitter:url" content="https://pebeto.github.io/MichiBoost.jl/guide/classification/"/><link rel="canonical" href="https://pebeto.github.io/MichiBoost.jl/guide/classification/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MichiBoost.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../getting_started/">Getting Started</a></li><li><span class="tocitem">User Guide</span><ul><li><a class="tocitem" href="../regression/">Regression</a></li><li class="is-active"><a class="tocitem" href>Classification</a><ul class="internal"><li><a class="tocitem" href="#Binary-Classification"><span>Binary Classification</span></a></li><li><a class="tocitem" href="#Multi-Class-Classification"><span>Multi-Class Classification</span></a></li><li><a class="tocitem" href="#Complete-Binary-Classification-Example"><span>Complete Binary Classification Example</span></a></li><li><a class="tocitem" href="#Complete-Multi-Class-Example"><span>Complete Multi-Class Example</span></a></li><li><a class="tocitem" href="#Working-with-String-Labels"><span>Working with String Labels</span></a></li></ul></li><li><a class="tocitem" href="../categorical_features/">Categorical Features</a></li><li><a class="tocitem" href="../hyperparameters/">Hyperparameters</a></li><li><a class="tocitem" href="../advanced/">Advanced Features</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../api/models/">Models</a></li><li><a class="tocitem" href="../../api/data/">Data Structures</a></li><li><a class="tocitem" href="../../api/training/">Training</a></li><li><a class="tocitem" href="../../api/prediction/">Prediction</a></li><li><a class="tocitem" href="../../api/utilities/">Utilities</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">User Guide</a></li><li class="is-active"><a href>Classification</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Classification</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/pebeto/MichiBoost.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Classification"><a class="docs-heading-anchor" href="#Classification">Classification</a><a id="Classification-1"></a><a class="docs-heading-anchor-permalink" href="#Classification" title="Permalink"></a></h1><p>MichiBoost.jl supports both binary and multi-class classification tasks.</p><h2 id="Binary-Classification"><a class="docs-heading-anchor" href="#Binary-Classification">Binary Classification</a><a id="Binary-Classification-1"></a><a class="docs-heading-anchor-permalink" href="#Binary-Classification" title="Permalink"></a></h2><p>For binary classification, use <code>MichiBoostClassifier</code> with the Logloss loss function:</p><pre><code class="language-julia hljs">using MichiBoost
+
+model = MichiBoostClassifier(;
+    iterations=200,
+    learning_rate=0.03,
+    depth=6,
+    loss_function=&quot;Logloss&quot;
+)
+
+fit!(model, X_train, y_train)</code></pre><h3 id="Prediction-Types"><a class="docs-heading-anchor" href="#Prediction-Types">Prediction Types</a><a id="Prediction-Types-1"></a><a class="docs-heading-anchor-permalink" href="#Prediction-Types" title="Permalink"></a></h3><pre><code class="language-julia hljs"># Get probability of positive class
+probabilities = predict_proba(model, X_test)
+
+# Get predicted class labels (default for classifiers)
+classes = predict(model, X_test)
+
+# Get raw logits (before sigmoid)
+logits = predict(model, X_test; prediction_type=&quot;RawFormulaVal&quot;)</code></pre><p><code>predict(clf, X)</code> returns class labels by default. Pass <code>prediction_type=&quot;Probability&quot;</code> to get probabilities, or <code>prediction_type=&quot;RawFormulaVal&quot;</code> for the pre-transform scores.</p><h2 id="Multi-Class-Classification"><a class="docs-heading-anchor" href="#Multi-Class-Classification">Multi-Class Classification</a><a id="Multi-Class-Classification-1"></a><a class="docs-heading-anchor-permalink" href="#Multi-Class-Classification" title="Permalink"></a></h2><p>Multi-class classification is automatically detected when your target has more than 2 unique values:</p><pre><code class="language-julia hljs">using MichiBoost
+
+# Target with 3 classes
+y = [0, 1, 2, 0, 1, 2, 0, 1, 2]
+
+model = MichiBoostClassifier(; iterations=200)
+fit!(model, X, y)</code></pre><h3 id="Multi-Class-Predictions"><a class="docs-heading-anchor" href="#Multi-Class-Predictions">Multi-Class Predictions</a><a id="Multi-Class-Predictions-1"></a><a class="docs-heading-anchor-permalink" href="#Multi-Class-Predictions" title="Permalink"></a></h3><pre><code class="language-julia hljs"># Get probability matrix (n_samples × n_classes)
+probabilities = predict_proba(model, X_test)
+
+# Get predicted class labels
+classes = predict(model, X_test)
+
+# probabilities[i, :] sums to 1.0 for each sample i</code></pre><h2 id="Complete-Binary-Classification-Example"><a class="docs-heading-anchor" href="#Complete-Binary-Classification-Example">Complete Binary Classification Example</a><a id="Complete-Binary-Classification-Example-1"></a><a class="docs-heading-anchor-permalink" href="#Complete-Binary-Classification-Example" title="Permalink"></a></h2><pre><code class="language-julia hljs">using MichiBoost, Random, Statistics
+
+# Generate synthetic binary classification data
+Random.seed!(42)
+n = 1000
+X = randn(n, 5)
+y = Float64.(X[:, 1] .+ X[:, 2] .&gt; 0)
+
+# Split data
+train_idx = 1:800
+test_idx = 801:1000
+
+X_train, y_train = X[train_idx, :], y[train_idx]
+X_test, y_test = X[test_idx, :], y[test_idx]
+
+# Train model
+model = MichiBoostClassifier(;
+    iterations=200,
+    learning_rate=0.05,
+    depth=4,
+    verbose=true
+)
+
+fit!(model, X_train, y_train)
+
+# Evaluate
+probs = predict_proba(model, X_test)
+preds = predict(model, X_test)
+
+accuracy = mean(preds .== y_test)
+println(&quot;Test Accuracy: $(round(accuracy * 100, digits=2))%&quot;)</code></pre><h2 id="Complete-Multi-Class-Example"><a class="docs-heading-anchor" href="#Complete-Multi-Class-Example">Complete Multi-Class Example</a><a id="Complete-Multi-Class-Example-1"></a><a class="docs-heading-anchor-permalink" href="#Complete-Multi-Class-Example" title="Permalink"></a></h2><pre><code class="language-julia hljs">using MichiBoost, Random, Statistics
+
+# Generate synthetic 3-class data
+Random.seed!(42)
+n = 900
+X = randn(n, 5)
+y = mod.(1:n, 3)  # Classes 0, 1, 2
+
+# Split data
+train_idx = 1:700
+test_idx = 701:900
+
+X_train, y_train = X[train_idx, :], y[train_idx]
+X_test, y_test = X[test_idx, :], y[test_idx]
+
+# Train model
+model = MichiBoostClassifier(;
+    iterations=200,
+    learning_rate=0.05,
+    depth=4,
+    loss_function=&quot;MultiClass&quot;
+)
+
+fit!(model, X_train, y_train)
+
+# Evaluate
+probs = predict_proba(model, X_test)  # Shape: (200, 3)
+preds = predict(model, X_test)
+
+accuracy = mean(preds .== y_test)
+println(&quot;Test Accuracy: $(round(accuracy * 100, digits=2))%&quot;)</code></pre><h2 id="Working-with-String-Labels"><a class="docs-heading-anchor" href="#Working-with-String-Labels">Working with String Labels</a><a id="Working-with-String-Labels-1"></a><a class="docs-heading-anchor-permalink" href="#Working-with-String-Labels" title="Permalink"></a></h2><p>MichiBoost.jl automatically handles string class labels:</p><pre><code class="language-julia hljs">using MichiBoost
+
+y = [&quot;cat&quot;, &quot;dog&quot;, &quot;cat&quot;, &quot;bird&quot;, &quot;dog&quot;, &quot;bird&quot;]
+X = randn(6, 3)
+
+model = MichiBoostClassifier(; iterations=50)
+fit!(model, X, y)
+
+# Predictions return original string labels
+predictions = predict(model, X)
+# [&quot;cat&quot;, &quot;dog&quot;, &quot;cat&quot;, &quot;bird&quot;, &quot;dog&quot;, &quot;bird&quot;]</code></pre><p>See the <a href="../advanced/">Advanced Features</a> guide for cross-validation, SHAP values, feature importance, sample weights, and model persistence.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../regression/">« Regression</a><a class="docs-footer-nextpage" href="../categorical_features/">Categorical Features »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Friday 24 April 2026 00:39">Friday 24 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
