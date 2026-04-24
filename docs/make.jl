@@ -2,6 +2,8 @@ push!(LOAD_PATH, "../src/")
 using Documenter
 using MichiBoost
 
+DocMeta.setdocmeta!(MichiBoost, :DocTestSetup, :(using MichiBoost); recursive=true)
+
 makedocs(;
     modules=[MichiBoost],
     authors="Jose Esparza <joseesparzadc@gmail.com>",
@@ -37,5 +39,4 @@ makedocs(;
 
 deploydocs(;
     repo="github.com/pebeto/MichiBoost.jl",
-    devbranch="main",
 )
