@@ -1,6 +1,6 @@
 """
 Fill row `li` of a multiclass numerical histogram and accumulate per-class
-totals into `total_g[li, :]` / `total_h[li, :]` (zeroed inside). Returns `n`.
+totals into `total_g[:, li]` / `total_h[:, li]` (zeroed inside). Returns `n`.
 Helper form provides a function barrier so Julia specializes on `group`'s
 concrete type — inlining the body into the caller would leave the hot loop
 iterating over `Any`.
@@ -10,8 +10,8 @@ function _fill_num_leaf_mc!(
     gradients, hessians, num_bins, buf, n_classes::Int,
 )
     @inbounds for c in 1:n_classes
-        total_g[li, c] = 0.0
-        total_h[li, c] = 0.0
+        total_g[c, li] = 0.0
+        total_h[c, li] = 0.0
     end
     n = length(group)
     if n >= 512
@@ -22,20 +22,20 @@ function _fill_num_leaf_mc!(
             idx = group[i]
             local_bins[i] = num_bins[idx, j]
             for c in 1:n_classes
-                local_g[i, c] = gradients[idx, c]
-                local_h[i, c] = hessians[idx, c]
+                local_g[c, i] = gradients[idx, c]
+                local_h[c, i] = hessians[idx, c]
             end
         end
         @inbounds for i in 1:n
             b = Int(local_bins[i]) + 1
             hist_c[li, b] += 1
             for c in 1:n_classes
-                gv = local_g[i, c]
-                hv = local_h[i, c]
-                hist_g[li, b, c] += gv
-                hist_h[li, b, c] += hv
-                total_g[li, c] += gv
-                total_h[li, c] += hv
+                gv = local_g[c, i]
+                hv = local_h[c, i]
+                hist_g[c, li, b] += gv
+                hist_h[c, li, b] += hv
+                total_g[c, li] += gv
+                total_h[c, li] += hv
             end
         end
     else
@@ -46,10 +46,10 @@ function _fill_num_leaf_mc!(
             for c in 1:n_classes
                 gv = gradients[idx, c]
                 hv = hessians[idx, c]
-                hist_g[li, b, c] += gv
-                hist_h[li, b, c] += hv
-                total_g[li, c] += gv
-                total_h[li, c] += hv
+                hist_g[c, li, b] += gv
+                hist_h[c, li, b] += hv
+                total_g[c, li] += gv
+                total_h[c, li] += hv
             end
         end
     end
@@ -61,8 +61,8 @@ function _fill_cat_leaf_mc!(
     gradients, hessians, cat_encoded, sorted_vals, buf, n_classes::Int,
 )
     @inbounds for c in 1:n_classes
-        total_g[li, c] = 0.0
-        total_h[li, c] = 0.0
+        total_g[c, li] = 0.0
+        total_h[c, li] = 0.0
     end
     n = length(group)
     if n >= 512
@@ -73,20 +73,20 @@ function _fill_cat_leaf_mc!(
             idx = group[i]
             local_cat[i] = cat_encoded[idx, j]
             for c in 1:n_classes
-                local_g[i, c] = gradients[idx, c]
-                local_h[i, c] = hessians[idx, c]
+                local_g[c, i] = gradients[idx, c]
+                local_h[c, i] = hessians[idx, c]
             end
         end
         @inbounds for i in 1:n
             b = searchsortedfirst(sorted_vals, local_cat[i])
             hist_c[li, b] += 1
             for c in 1:n_classes
-                gv = local_g[i, c]
-                hv = local_h[i, c]
-                hist_g[li, b, c] += gv
-                hist_h[li, b, c] += hv
-                total_g[li, c] += gv
-                total_h[li, c] += hv
+                gv = local_g[c, i]
+                hv = local_h[c, i]
+                hist_g[c, li, b] += gv
+                hist_h[c, li, b] += hv
+                total_g[c, li] += gv
+                total_h[c, li] += hv
             end
         end
     else
@@ -97,10 +97,10 @@ function _fill_cat_leaf_mc!(
             for c in 1:n_classes
                 gv = gradients[idx, c]
                 hv = hessians[idx, c]
-                hist_g[li, b, c] += gv
-                hist_h[li, b, c] += hv
-                total_g[li, c] += gv
-                total_h[li, c] += hv
+                hist_g[c, li, b] += gv
+                hist_h[c, li, b] += hv
+                total_g[c, li] += gv
+                total_h[c, li] += hv
             end
         end
     end
@@ -130,8 +130,8 @@ function _fill_num_hist_mc!(
                 scratch_c[b] = cv
                 parent_n_sum += cv
                 for c in 1:n_classes
-                    scratch_g[b, c] = hist_g[p, b, c]
-                    scratch_h[b, c] = hist_h[p, b, c]
+                    scratch_g[c, b] = hist_g[c, p, b]
+                    scratch_h[c, b] = hist_h[c, p, b]
                 end
             end
 
@@ -150,8 +150,8 @@ function _fill_num_hist_mc!(
             for b in 1:nb1
                 hist_c[smaller_li, b] = 0
                 for c in 1:n_classes
-                    hist_g[smaller_li, b, c] = 0.0
-                    hist_h[smaller_li, b, c] = 0.0
+                    hist_g[c, smaller_li, b] = 0.0
+                    hist_h[c, smaller_li, b] = 0.0
                 end
             end
 
@@ -166,17 +166,17 @@ function _fill_num_hist_mc!(
                 parent_g_c = 0.0
                 parent_h_c = 0.0
                 for b in 1:nb1
-                    pg = scratch_g[b, c]
-                    ph = scratch_h[b, c]
-                    sg = hist_g[smaller_li, b, c]
-                    sh = hist_h[smaller_li, b, c]
-                    hist_g[larger_li, b, c] = pg - sg
-                    hist_h[larger_li, b, c] = ph - sh
+                    pg = scratch_g[c, b]
+                    ph = scratch_h[c, b]
+                    sg = hist_g[c, smaller_li, b]
+                    sh = hist_h[c, smaller_li, b]
+                    hist_g[c, larger_li, b] = pg - sg
+                    hist_h[c, larger_li, b] = ph - sh
                     parent_g_c += pg
                     parent_h_c += ph
                 end
-                total_g[larger_li, c] = parent_g_c - total_g[smaller_li, c]
-                total_h[larger_li, c] = parent_h_c - total_h[smaller_li, c]
+                total_g[c, larger_li] = parent_g_c - total_g[c, smaller_li]
+                total_h[c, larger_li] = parent_h_c - total_h[c, smaller_li]
             end
             for b in 1:nb1
                 hist_c[larger_li, b] = scratch_c[b] - hist_c[smaller_li, b]
@@ -190,8 +190,8 @@ function _fill_num_hist_mc!(
             for b in 1:nb1
                 hist_c[li, b] = 0
                 for c in 1:n_classes
-                    hist_g[li, b, c] = 0.0
-                    hist_h[li, b, c] = 0.0
+                    hist_g[c, li, b] = 0.0
+                    hist_h[c, li, b] = 0.0
                 end
             end
             group = leaf_groups[li]
@@ -228,8 +228,8 @@ function _fill_cat_hist_mc!(
                 scratch_c[b] = cv
                 parent_n_sum += cv
                 for c in 1:n_classes
-                    scratch_g[b, c] = hist_g[p, b, c]
-                    scratch_h[b, c] = hist_h[p, b, c]
+                    scratch_g[c, b] = hist_g[c, p, b]
+                    scratch_h[c, b] = hist_h[c, p, b]
                 end
             end
 
@@ -248,8 +248,8 @@ function _fill_cat_hist_mc!(
             for b in 1:nv
                 hist_c[smaller_li, b] = 0
                 for c in 1:n_classes
-                    hist_g[smaller_li, b, c] = 0.0
-                    hist_h[smaller_li, b, c] = 0.0
+                    hist_g[c, smaller_li, b] = 0.0
+                    hist_h[c, smaller_li, b] = 0.0
                 end
             end
 
@@ -264,17 +264,17 @@ function _fill_cat_hist_mc!(
                 parent_g_c = 0.0
                 parent_h_c = 0.0
                 for b in 1:nv
-                    pg = scratch_g[b, c]
-                    ph = scratch_h[b, c]
-                    sg = hist_g[smaller_li, b, c]
-                    sh = hist_h[smaller_li, b, c]
-                    hist_g[larger_li, b, c] = pg - sg
-                    hist_h[larger_li, b, c] = ph - sh
+                    pg = scratch_g[c, b]
+                    ph = scratch_h[c, b]
+                    sg = hist_g[c, smaller_li, b]
+                    sh = hist_h[c, smaller_li, b]
+                    hist_g[c, larger_li, b] = pg - sg
+                    hist_h[c, larger_li, b] = ph - sh
                     parent_g_c += pg
                     parent_h_c += ph
                 end
-                total_g[larger_li, c] = parent_g_c - total_g[smaller_li, c]
-                total_h[larger_li, c] = parent_h_c - total_h[smaller_li, c]
+                total_g[c, larger_li] = parent_g_c - total_g[c, smaller_li]
+                total_h[c, larger_li] = parent_h_c - total_h[c, smaller_li]
             end
             for b in 1:nv
                 hist_c[larger_li, b] = scratch_c[b] - hist_c[smaller_li, b]
@@ -288,8 +288,8 @@ function _fill_cat_hist_mc!(
             for b in 1:nv
                 hist_c[li, b] = 0
                 for c in 1:n_classes
-                    hist_g[li, b, c] = 0.0
-                    hist_h[li, b, c] = 0.0
+                    hist_g[c, li, b] = 0.0
+                    hist_h[c, li, b] = 0.0
                 end
             end
             group = leaf_groups[li]
@@ -312,16 +312,16 @@ function _sweep_gain_mc(
     @inbounds for li in 1:n_leaves
         left_c[li] = hist_c[li, 1]
         for c in 1:n_classes
-            left_g[li, c] = hist_g[li, 1, c]
-            left_h[li, c] = hist_h[li, 1, c]
+            left_g[c, li] = hist_g[c, li, 1]
+            left_h[c, li] = hist_h[c, li, 1]
         end
     end
     @inbounds for b in 2:nb_or_nv
         @inbounds for li in 1:n_leaves
             left_c[li] += hist_c[li, b]
             for c in 1:n_classes
-                left_g[li, c] += hist_g[li, b, c]
-                left_h[li, c] += hist_h[li, b, c]
+                left_g[c, li] += hist_g[c, li, b]
+                left_h[c, li] += hist_h[c, li, b]
             end
         end
         gain = 0.0
@@ -331,12 +331,12 @@ function _sweep_gain_mc(
             rc = total_n[li] - lc
             (lc < min_data_in_leaf || rc < min_data_in_leaf) && continue
             for c in 1:n_classes
-                rg = total_g[li, c] - left_g[li, c]
-                rh = total_h[li, c] - left_h[li, c]
+                rg = total_g[c, li] - left_g[c, li]
+                rh = total_h[c, li] - left_h[c, li]
                 gain +=
-                    left_g[li, c]^2 / (left_h[li, c] + l2_leaf_reg) +
+                    left_g[c, li]^2 / (left_h[c, li] + l2_leaf_reg) +
                     rg^2 / (rh + l2_leaf_reg) -
-                    total_g[li, c]^2 / (total_h[li, c] + l2_leaf_reg)
+                    total_g[c, li]^2 / (total_h[c, li] + l2_leaf_reg)
             end
         end
         if gain > best_gain

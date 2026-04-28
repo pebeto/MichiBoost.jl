@@ -207,41 +207,41 @@ function rotate_hist_cache!(cache::HistCache)
 end
 
 struct SplitBuffersMC
-    total_g::Matrix{Float64}         # (max_leaves × n_classes) per-thread totals
+    # Class is the first (stride-1) axis on every per-class buffer so the hot
+    # `for c in 1:n_classes` inner loops sweep contiguous memory.
+    total_g::Matrix{Float64}         # (n_classes × max_leaves)
     total_h::Matrix{Float64}
     total_n::Vector{Int}
-    left_g::Matrix{Float64}          # (max_leaves × n_classes)
+    left_g::Matrix{Float64}          # (n_classes × max_leaves)
     left_h::Matrix{Float64}
     left_c::Vector{Int}
     indices::Vector{Int}
     indices_tmp::Vector{Int}
-    # Leaf-local compact arrays for cache-friendly access
-    local_gradients_mc::Matrix{Float64}  # (n_samples × n_classes)
+    local_gradients_mc::Matrix{Float64}  # (n_classes × n_samples)
     local_hessians_mc::Matrix{Float64}
     local_bins::Vector{UInt16}
     local_cat_values::Vector{Float64}
-    # Scratch for one parent histogram row during subtraction trick
-    parent_hist_g_scratch::Matrix{Float64}  # (max_bins × n_classes)
+    parent_hist_g_scratch::Matrix{Float64}  # (n_classes × max_bins)
     parent_hist_h_scratch::Matrix{Float64}
     parent_hist_c_scratch::Vector{Int}      # (max_bins,)
 end
 
 function SplitBuffersMC(max_leaves::Int, max_bins::Int, n_classes::Int, n_samples::Int)
     return SplitBuffersMC(
-        zeros(Float64, max_leaves, n_classes),
-        zeros(Float64, max_leaves, n_classes),
+        zeros(Float64, n_classes, max_leaves),
+        zeros(Float64, n_classes, max_leaves),
         zeros(Int, max_leaves),
-        zeros(Float64, max_leaves, n_classes),
-        zeros(Float64, max_leaves, n_classes),
+        zeros(Float64, n_classes, max_leaves),
+        zeros(Float64, n_classes, max_leaves),
         zeros(Int, max_leaves),
         zeros(Int, n_samples),
         zeros(Int, n_samples),
-        zeros(Float64, n_samples, n_classes),
-        zeros(Float64, n_samples, n_classes),
+        zeros(Float64, n_classes, n_samples),
+        zeros(Float64, n_classes, n_samples),
         zeros(UInt16, n_samples),
         zeros(Float64, n_samples),
-        zeros(Float64, max_bins, n_classes),
-        zeros(Float64, max_bins, n_classes),
+        zeros(Float64, n_classes, max_bins),
+        zeros(Float64, n_classes, max_bins),
         zeros(Int, max_bins),
     )
 end
@@ -249,11 +249,11 @@ end
 """
     HistCacheMC
 
-Multiclass counterpart of `HistCache`. Per-feature histograms are stored
-as 3D arrays of shape `(max_leaves, n_bins, n_classes)` for gradients
-and hessians, plus 2D `(max_leaves, n_bins)` for counts (counts are
-class-independent). See `HistCache` docstring for the subtraction-trick
-machinery; the layout choice keeps the per-class inner loop contiguous.
+Multiclass counterpart of `HistCache`. Per-feature gradient and hessian
+histograms are stored as 3D arrays of shape `(n_classes, max_leaves, n_bins)`,
+plus 2D `(max_leaves, n_bins)` for the class-independent counts. Putting the
+class axis first makes the hot `for c in 1:n_classes` inner loop stride-1.
+See `HistCache` for the subtraction-trick machinery.
 """
 mutable struct HistCacheMC
     num_hist_g::Vector{Array{Float64,3}}
@@ -277,14 +277,14 @@ function HistCacheMC(
 )
     n_num = length(num_n_bins)
     n_cat = length(cat_sorted_vals)
-    num_hist_g = [zeros(Float64, max_leaves, num_n_bins[j] + 1, n_classes) for j in 1:n_num]
-    num_hist_h = [zeros(Float64, max_leaves, num_n_bins[j] + 1, n_classes) for j in 1:n_num]
+    num_hist_g = [zeros(Float64, n_classes, max_leaves, num_n_bins[j] + 1) for j in 1:n_num]
+    num_hist_h = [zeros(Float64, n_classes, max_leaves, num_n_bins[j] + 1) for j in 1:n_num]
     num_hist_c = [zeros(Int, max_leaves, num_n_bins[j] + 1) for j in 1:n_num]
     cat_hist_g = [
-        zeros(Float64, max_leaves, max(length(cat_sorted_vals[j]), 1), n_classes) for j in 1:n_cat
+        zeros(Float64, n_classes, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat
     ]
     cat_hist_h = [
-        zeros(Float64, max_leaves, max(length(cat_sorted_vals[j]), 1), n_classes) for j in 1:n_cat
+        zeros(Float64, n_classes, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat
     ]
     cat_hist_c = [zeros(Int, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat]
     return HistCacheMC(
