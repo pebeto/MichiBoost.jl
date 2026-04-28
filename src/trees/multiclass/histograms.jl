@@ -305,10 +305,28 @@ end
 
 function _sweep_gain_mc(
     hist_g, hist_h, hist_c, total_g, total_h, total_n,
-    left_g, left_h, left_c, n_leaves, nb_or_nv, l2_leaf_reg, min_data_in_leaf, n_classes,
+    left_g, left_h, left_c, total_score,
+    n_leaves, nb_or_nv, l2_leaf_reg, min_data_in_leaf, n_classes,
 )
     best_gain = -Inf
     best_b = -1
+
+    # The third gain term `total_g²/(total_h + λ)` depends only on (c, li), so
+    # lift it out of the b-sweep — at nb=256, leaves=64, classes=7 the inner
+    # version recomputes ~115k divisions per feature per level.
+    @inbounds for li in 1:n_leaves
+        if total_n[li] == 0
+            for c in 1:n_classes
+                total_score[c, li] = 0.0
+            end
+        else
+            for c in 1:n_classes
+                total_score[c, li] =
+                    total_g[c, li]^2 / (total_h[c, li] + l2_leaf_reg)
+            end
+        end
+    end
+
     @inbounds for li in 1:n_leaves
         left_c[li] = hist_c[li, 1]
         for c in 1:n_classes
@@ -336,7 +354,7 @@ function _sweep_gain_mc(
                 gain +=
                     left_g[c, li]^2 / (left_h[c, li] + l2_leaf_reg) +
                     rg^2 / (rh + l2_leaf_reg) -
-                    total_g[c, li]^2 / (total_h[c, li] + l2_leaf_reg)
+                    total_score[c, li]
             end
         end
         if gain > best_gain
@@ -387,7 +405,7 @@ function _find_best_split_across_leaves_mc(
         cache.num_hist_filled[j] = true
         gain, b = _sweep_gain_mc(
             hist_g, hist_h, hist_c, buf.total_g, buf.total_h, buf.total_n,
-            buf.left_g, buf.left_h, buf.left_c,
+            buf.left_g, buf.left_h, buf.left_c, buf.total_score,
             n_leaves, nb + 1, l2_leaf_reg, min_data_in_leaf, n_classes,
         )
         if gain > thread_bests[tid].gain
@@ -413,7 +431,7 @@ function _find_best_split_across_leaves_mc(
             cache.cat_hist_filled[j] = false
             gain, b = _sweep_gain_mc(
                 hist_g, hist_h, hist_c, buf.total_g, buf.total_h, buf.total_n,
-                buf.left_g, buf.left_h, buf.left_c,
+                buf.left_g, buf.left_h, buf.left_c, buf.total_score,
                 n_leaves, nv, l2_leaf_reg, min_data_in_leaf, n_classes,
             )
             if gain > thread_bests[tid].gain && b > 0
@@ -438,7 +456,7 @@ function _find_best_split_across_leaves_mc(
             cache.cat_hist_filled[j] = true
             gain, b = _sweep_gain_mc(
                 hist_g, hist_h, hist_c, buf.total_g, buf.total_h, buf.total_n,
-                buf.left_g, buf.left_h, buf.left_c,
+                buf.left_g, buf.left_h, buf.left_c, buf.total_score,
                 n_leaves, nv, l2_leaf_reg, min_data_in_leaf, n_classes,
             )
             if gain > thread_bests[tid].gain && b > 0

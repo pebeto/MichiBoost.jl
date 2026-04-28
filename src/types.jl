@@ -212,6 +212,10 @@ struct SplitBuffersMC
     total_g::Matrix{Float64}         # (n_classes × max_leaves)
     total_h::Matrix{Float64}
     total_n::Vector{Int}
+    # Precomputed total_g²/(total_h + l2_leaf_reg) per (c, leaf). This is the
+    # b-invariant subtractive term in `_sweep_gain_mc`; lifting it out of the
+    # bin sweep saves ~n_bins × n_leaves × n_classes divisions per feature.
+    total_score::Matrix{Float64}     # (n_classes × max_leaves)
     left_g::Matrix{Float64}          # (n_classes × max_leaves)
     left_h::Matrix{Float64}
     left_c::Vector{Int}
@@ -231,6 +235,7 @@ function SplitBuffersMC(max_leaves::Int, max_bins::Int, n_classes::Int, n_sample
         zeros(Float64, n_classes, max_leaves),
         zeros(Float64, n_classes, max_leaves),
         zeros(Int, max_leaves),
+        zeros(Float64, n_classes, max_leaves),
         zeros(Float64, n_classes, max_leaves),
         zeros(Float64, n_classes, max_leaves),
         zeros(Int, max_leaves),
