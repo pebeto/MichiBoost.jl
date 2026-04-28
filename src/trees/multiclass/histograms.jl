@@ -14,43 +14,17 @@ function _fill_num_leaf_mc!(
         total_h[c, li] = 0.0
     end
     n = length(group)
-    if n >= 512
-        local_bins = buf.local_bins
-        local_g = buf.local_gradients_mc
-        local_h = buf.local_hessians_mc
-        @inbounds for i in 1:n
-            idx = group[i]
-            local_bins[i] = num_bins[idx, j]
-            for c in 1:n_classes
-                local_g[c, i] = gradients[idx, c]
-                local_h[c, i] = hessians[idx, c]
-            end
-        end
-        @inbounds for i in 1:n
-            b = Int(local_bins[i]) + 1
-            hist_c[li, b] += 1
-            for c in 1:n_classes
-                gv = local_g[c, i]
-                hv = local_h[c, i]
-                hist_g[c, li, b] += gv
-                hist_h[c, li, b] += hv
-                total_g[c, li] += gv
-                total_h[c, li] += hv
-            end
-        end
-    else
-        @inbounds for i in 1:n
-            idx = group[i]
-            b = Int(num_bins[idx, j]) + 1
-            hist_c[li, b] += 1
-            for c in 1:n_classes
-                gv = gradients[idx, c]
-                hv = hessians[idx, c]
-                hist_g[c, li, b] += gv
-                hist_h[c, li, b] += hv
-                total_g[c, li] += gv
-                total_h[c, li] += hv
-            end
+    @inbounds for i in 1:n
+        idx = group[i]
+        b = Int(num_bins[idx, j]) + 1
+        hist_c[li, b] += 1
+        for c in 1:n_classes
+            gv = gradients[idx, c]
+            hv = hessians[idx, c]
+            hist_g[c, li, b] += gv
+            hist_h[c, li, b] += hv
+            total_g[c, li] += gv
+            total_h[c, li] += hv
         end
     end
     return n
@@ -65,43 +39,17 @@ function _fill_cat_leaf_mc!(
         total_h[c, li] = 0.0
     end
     n = length(group)
-    if n >= 512
-        local_cat = buf.local_cat_values
-        local_g = buf.local_gradients_mc
-        local_h = buf.local_hessians_mc
-        @inbounds for i in 1:n
-            idx = group[i]
-            local_cat[i] = cat_encoded[idx, j]
-            for c in 1:n_classes
-                local_g[c, i] = gradients[idx, c]
-                local_h[c, i] = hessians[idx, c]
-            end
-        end
-        @inbounds for i in 1:n
-            b = searchsortedfirst(sorted_vals, local_cat[i])
-            hist_c[li, b] += 1
-            for c in 1:n_classes
-                gv = local_g[c, i]
-                hv = local_h[c, i]
-                hist_g[c, li, b] += gv
-                hist_h[c, li, b] += hv
-                total_g[c, li] += gv
-                total_h[c, li] += hv
-            end
-        end
-    else
-        @inbounds for i in 1:n
-            idx = group[i]
-            b = searchsortedfirst(sorted_vals, cat_encoded[idx, j])
-            hist_c[li, b] += 1
-            for c in 1:n_classes
-                gv = gradients[idx, c]
-                hv = hessians[idx, c]
-                hist_g[c, li, b] += gv
-                hist_h[c, li, b] += hv
-                total_g[c, li] += gv
-                total_h[c, li] += hv
-            end
+    @inbounds for i in 1:n
+        idx = group[i]
+        b = searchsortedfirst(sorted_vals, cat_encoded[idx, j])
+        hist_c[li, b] += 1
+        for c in 1:n_classes
+            gv = gradients[idx, c]
+            hv = hessians[idx, c]
+            hist_g[c, li, b] += gv
+            hist_h[c, li, b] += hv
+            total_g[c, li] += gv
+            total_h[c, li] += hv
         end
     end
     return n
@@ -389,7 +337,7 @@ function _find_best_split_across_leaves_mc(
         n_samples_level += length(leaf_groups[li])
     end
 
-    Threads.@threads :static for j in sampled_num
+    Threads.@threads :dynamic for j in sampled_num
         nb = qf.n_bins[j]
         nb <= 1 && continue
         tid = Threads.threadid()
@@ -413,7 +361,7 @@ function _find_best_split_across_leaves_mc(
         end
     end
 
-    Threads.@threads :static for j in sampled_cat
+    Threads.@threads :dynamic for j in sampled_cat
         if isempty(cat_sorted_vals)
             sorted_vals_local = _collect_cat_vals(leaf_groups, cat_encoded, j)
             nv = length(sorted_vals_local)

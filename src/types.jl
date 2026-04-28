@@ -221,10 +221,6 @@ struct SplitBuffersMC
     left_c::Vector{Int}
     indices::Vector{Int}
     indices_tmp::Vector{Int}
-    local_gradients_mc::Matrix{Float64}  # (n_classes × n_samples)
-    local_hessians_mc::Matrix{Float64}
-    local_bins::Vector{UInt16}
-    local_cat_values::Vector{Float64}
     parent_hist_g_scratch::Matrix{Float64}  # (n_classes × max_bins)
     parent_hist_h_scratch::Matrix{Float64}
     parent_hist_c_scratch::Vector{Int}      # (max_bins,)
@@ -241,10 +237,6 @@ function SplitBuffersMC(max_leaves::Int, max_bins::Int, n_classes::Int, n_sample
         zeros(Int, max_leaves),
         zeros(Int, n_samples),
         zeros(Int, n_samples),
-        zeros(Float64, n_classes, n_samples),
-        zeros(Float64, n_classes, n_samples),
-        zeros(UInt16, n_samples),
-        zeros(Float64, n_samples),
         zeros(Float64, n_classes, max_bins),
         zeros(Float64, n_classes, max_bins),
         zeros(Int, max_bins),
