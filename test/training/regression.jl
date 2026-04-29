@@ -17,7 +17,9 @@ end
     X = [1.0 2.0; 3.0 4.0; 5.0 6.0; 7.0 8.0]
     y = [1.0, 2.0, 3.0, 4.0]
 
-    model = MichiBoostRegressor(; iterations=10, depth=2, loss_function="MAE", verbose=false)
+    model = MichiBoostRegressor(;
+        iterations=10, depth=2, loss_function="MAE", verbose=false
+    )
     MichiBoost.fit!(model, X, y)
 
     preds = MichiBoost.predict(model, X)

@@ -6,8 +6,19 @@ concrete type — inlining the body into the caller would leave the hot loop
 iterating over `Any`.
 """
 function _fill_num_leaf_mc!(
-    hist_g, hist_h, hist_c, total_g, total_h, li::Int, group, j::Int,
-    gradients, hessians, num_bins, buf, n_classes::Int,
+    hist_g,
+    hist_h,
+    hist_c,
+    total_g,
+    total_h,
+    li::Int,
+    group,
+    j::Int,
+    gradients,
+    hessians,
+    num_bins,
+    buf,
+    n_classes::Int,
 )
     @inbounds for c in 1:n_classes
         total_g[c, li] = 0.0
@@ -31,8 +42,20 @@ function _fill_num_leaf_mc!(
 end
 
 function _fill_cat_leaf_mc!(
-    hist_g, hist_h, hist_c, total_g, total_h, li::Int, group, j::Int,
-    gradients, hessians, cat_encoded, sorted_vals, buf, n_classes::Int,
+    hist_g,
+    hist_h,
+    hist_c,
+    total_g,
+    total_h,
+    li::Int,
+    group,
+    j::Int,
+    gradients,
+    hessians,
+    cat_encoded,
+    sorted_vals,
+    buf,
+    n_classes::Int,
 )
     @inbounds for c in 1:n_classes
         total_g[c, li] = 0.0
@@ -56,8 +79,19 @@ function _fill_cat_leaf_mc!(
 end
 
 function _fill_num_hist_mc!(
-    buf, hist_g, hist_h, hist_c, leaf_groups, j,
-    gradients, hessians, num_bins, nb, n_classes, has_parent::Bool, n_samples_level::Int,
+    buf,
+    hist_g,
+    hist_h,
+    hist_c,
+    leaf_groups,
+    j,
+    gradients,
+    hessians,
+    num_bins,
+    nb,
+    n_classes,
+    has_parent::Bool,
+    n_samples_level::Int,
 )
     nb1 = nb + 1
     n_leaves = length(leaf_groups)
@@ -104,8 +138,19 @@ function _fill_num_hist_mc!(
             end
 
             n_small = _fill_num_leaf_mc!(
-                hist_g, hist_h, hist_c, total_g, total_h, smaller_li, smaller_group, j,
-                gradients, hessians, num_bins, buf, n_classes,
+                hist_g,
+                hist_h,
+                hist_c,
+                total_g,
+                total_h,
+                smaller_li,
+                smaller_group,
+                j,
+                gradients,
+                hessians,
+                num_bins,
+                buf,
+                n_classes,
             )
 
             total_n[smaller_li] = n_small
@@ -144,8 +189,19 @@ function _fill_num_hist_mc!(
             end
             group = leaf_groups[li]
             n = _fill_num_leaf_mc!(
-                hist_g, hist_h, hist_c, total_g, total_h, li, group, j,
-                gradients, hessians, num_bins, buf, n_classes,
+                hist_g,
+                hist_h,
+                hist_c,
+                total_g,
+                total_h,
+                li,
+                group,
+                j,
+                gradients,
+                hessians,
+                num_bins,
+                buf,
+                n_classes,
             )
             total_n[li] = n
         end
@@ -154,8 +210,19 @@ function _fill_num_hist_mc!(
 end
 
 function _fill_cat_hist_mc!(
-    buf, hist_g, hist_h, hist_c, leaf_groups, j,
-    gradients, hessians, cat_encoded, sorted_vals, nv, n_classes, has_parent::Bool,
+    buf,
+    hist_g,
+    hist_h,
+    hist_c,
+    leaf_groups,
+    j,
+    gradients,
+    hessians,
+    cat_encoded,
+    sorted_vals,
+    nv,
+    n_classes,
+    has_parent::Bool,
     n_samples_level::Int,
 )
     n_leaves = length(leaf_groups)
@@ -202,8 +269,20 @@ function _fill_cat_hist_mc!(
             end
 
             n_small = _fill_cat_leaf_mc!(
-                hist_g, hist_h, hist_c, total_g, total_h, smaller_li, smaller_group, j,
-                gradients, hessians, cat_encoded, sorted_vals, buf, n_classes,
+                hist_g,
+                hist_h,
+                hist_c,
+                total_g,
+                total_h,
+                smaller_li,
+                smaller_group,
+                j,
+                gradients,
+                hessians,
+                cat_encoded,
+                sorted_vals,
+                buf,
+                n_classes,
             )
 
             total_n[smaller_li] = n_small
@@ -242,8 +321,20 @@ function _fill_cat_hist_mc!(
             end
             group = leaf_groups[li]
             n = _fill_cat_leaf_mc!(
-                hist_g, hist_h, hist_c, total_g, total_h, li, group, j,
-                gradients, hessians, cat_encoded, sorted_vals, buf, n_classes,
+                hist_g,
+                hist_h,
+                hist_c,
+                total_g,
+                total_h,
+                li,
+                group,
+                j,
+                gradients,
+                hessians,
+                cat_encoded,
+                sorted_vals,
+                buf,
+                n_classes,
             )
             total_n[li] = n
         end
@@ -252,9 +343,21 @@ function _fill_cat_hist_mc!(
 end
 
 function _sweep_gain_mc(
-    hist_g, hist_h, hist_c, total_g, total_h, total_n,
-    left_g, left_h, left_c, total_score,
-    n_leaves, nb_or_nv, l2_leaf_reg, min_data_in_leaf, n_classes,
+    hist_g,
+    hist_h,
+    hist_c,
+    total_g,
+    total_h,
+    total_n,
+    left_g,
+    left_h,
+    left_c,
+    total_score,
+    n_leaves,
+    nb_or_nv,
+    l2_leaf_reg,
+    min_data_in_leaf,
+    n_classes,
 )
     best_gain = -Inf
     best_b = -1
@@ -269,8 +372,7 @@ function _sweep_gain_mc(
             end
         else
             for c in 1:n_classes
-                total_score[c, li] =
-                    total_g[c, li]^2 / (total_h[c, li] + l2_leaf_reg)
+                total_score[c, li] = total_g[c, li]^2 / (total_h[c, li] + l2_leaf_reg)
             end
         end
     end
@@ -301,8 +403,7 @@ function _sweep_gain_mc(
                 rh = total_h[c, li] - left_h[c, li]
                 gain +=
                     left_g[c, li]^2 / (left_h[c, li] + l2_leaf_reg) +
-                    rg^2 / (rh + l2_leaf_reg) -
-                    total_score[c, li]
+                    rg^2 / (rh + l2_leaf_reg) - total_score[c, li]
             end
         end
         if gain > best_gain
@@ -347,14 +448,37 @@ function _find_best_split_across_leaves_mc(
         hist_c = cache.num_hist_c[j]
         has_parent = cache.num_hist_valid[j]
         _fill_num_hist_mc!(
-            buf, hist_g, hist_h, hist_c, leaf_groups, j,
-            gradients, hessians, num_bins, nb, n_classes, has_parent, n_samples_level,
+            buf,
+            hist_g,
+            hist_h,
+            hist_c,
+            leaf_groups,
+            j,
+            gradients,
+            hessians,
+            num_bins,
+            nb,
+            n_classes,
+            has_parent,
+            n_samples_level,
         )
         cache.num_hist_filled[j] = true
         gain, b = _sweep_gain_mc(
-            hist_g, hist_h, hist_c, buf.total_g, buf.total_h, buf.total_n,
-            buf.left_g, buf.left_h, buf.left_c, buf.total_score,
-            n_leaves, nb + 1, l2_leaf_reg, min_data_in_leaf, n_classes,
+            hist_g,
+            hist_h,
+            hist_c,
+            buf.total_g,
+            buf.total_h,
+            buf.total_n,
+            buf.left_g,
+            buf.left_h,
+            buf.left_c,
+            buf.total_score,
+            n_leaves,
+            nb + 1,
+            l2_leaf_reg,
+            min_data_in_leaf,
+            n_classes,
         )
         if gain > thread_bests[tid].gain
             thread_bests[tid] = SplitCandidate(j, false, Float64(b - 1), gain)
@@ -372,15 +496,38 @@ function _find_best_split_across_leaves_mc(
             hist_h = cache.cat_hist_h[j]
             hist_c = cache.cat_hist_c[j]
             _fill_cat_hist_mc!(
-                buf, hist_g, hist_h, hist_c, leaf_groups, j,
-                gradients, hessians, cat_encoded, sorted_vals_local, nv, n_classes, false,
+                buf,
+                hist_g,
+                hist_h,
+                hist_c,
+                leaf_groups,
+                j,
+                gradients,
+                hessians,
+                cat_encoded,
+                sorted_vals_local,
+                nv,
+                n_classes,
+                false,
                 n_samples_level,
             )
             cache.cat_hist_filled[j] = false
             gain, b = _sweep_gain_mc(
-                hist_g, hist_h, hist_c, buf.total_g, buf.total_h, buf.total_n,
-                buf.left_g, buf.left_h, buf.left_c, buf.total_score,
-                n_leaves, nv, l2_leaf_reg, min_data_in_leaf, n_classes,
+                hist_g,
+                hist_h,
+                hist_c,
+                buf.total_g,
+                buf.total_h,
+                buf.total_n,
+                buf.left_g,
+                buf.left_h,
+                buf.left_c,
+                buf.total_score,
+                n_leaves,
+                nv,
+                l2_leaf_reg,
+                min_data_in_leaf,
+                n_classes,
             )
             if gain > thread_bests[tid].gain && b > 0
                 threshold = (sorted_vals_local[b - 1] + sorted_vals_local[b]) / 2.0
@@ -397,15 +544,38 @@ function _find_best_split_across_leaves_mc(
             hist_c = cache.cat_hist_c[j]
             has_parent = cache.cat_hist_valid[j]
             _fill_cat_hist_mc!(
-                buf, hist_g, hist_h, hist_c, leaf_groups, j,
-                gradients, hessians, cat_encoded, sorted_vals, nv, n_classes, has_parent,
+                buf,
+                hist_g,
+                hist_h,
+                hist_c,
+                leaf_groups,
+                j,
+                gradients,
+                hessians,
+                cat_encoded,
+                sorted_vals,
+                nv,
+                n_classes,
+                has_parent,
                 n_samples_level,
             )
             cache.cat_hist_filled[j] = true
             gain, b = _sweep_gain_mc(
-                hist_g, hist_h, hist_c, buf.total_g, buf.total_h, buf.total_n,
-                buf.left_g, buf.left_h, buf.left_c, buf.total_score,
-                n_leaves, nv, l2_leaf_reg, min_data_in_leaf, n_classes,
+                hist_g,
+                hist_h,
+                hist_c,
+                buf.total_g,
+                buf.total_h,
+                buf.total_n,
+                buf.left_g,
+                buf.left_h,
+                buf.left_c,
+                buf.total_score,
+                n_leaves,
+                nv,
+                l2_leaf_reg,
+                min_data_in_leaf,
+                n_classes,
             )
             if gain > thread_bests[tid].gain && b > 0
                 threshold = (sorted_vals[b - 1] + sorted_vals[b]) / 2.0

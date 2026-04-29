@@ -40,7 +40,12 @@ function predict(model::MichiBoostModel, pool::Pool)
             lbuf = leaf_bufs[k]
             for i in lo:hi
                 predict_tree!(
-                    partials[k], model.trees[i], num_bins, cat_encoded, model.learning_rate, lbuf
+                    partials[k],
+                    model.trees[i],
+                    num_bins,
+                    cat_encoded,
+                    model.learning_rate,
+                    lbuf,
                 )
             end
         end
@@ -58,7 +63,12 @@ function predict(model::MichiBoostModel, pool::Pool)
             lbuf = leaf_bufs[k]
             for i in lo:hi
                 predict_tree!(
-                    partials[k], model.trees[i], num_bins, cat_encoded, model.learning_rate, lbuf
+                    partials[k],
+                    model.trees[i],
+                    num_bins,
+                    cat_encoded,
+                    model.learning_rate,
+                    lbuf,
                 )
             end
         end
@@ -109,7 +119,7 @@ function feature_importance(model::MichiBoostModel)
     end
     importance = Dict{Symbol,Float64}()
 
-    for tree in model.trees, k in 1:tree.depth
+    for tree in model.trees, k in 1:(tree.depth)
         name = if tree.split_feature_types[k] == :numerical
             j = tree.split_feature_indices[k]
             if j <= length(model.numerical_feature_indices)

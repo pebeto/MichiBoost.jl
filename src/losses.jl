@@ -112,8 +112,12 @@ end
 # RMSE/MAE ignore `scratch`.
 
 function gradient_hessian!(
-    g::AbstractVector, h::AbstractVector, ::RMSELoss,
-    y::AbstractVector, pred::AbstractVector, _scratch,
+    g::AbstractVector,
+    h::AbstractVector,
+    ::RMSELoss,
+    y::AbstractVector,
+    pred::AbstractVector,
+    _scratch,
 )
     @. g = y - pred
     fill!(h, 1.0)
@@ -121,8 +125,12 @@ function gradient_hessian!(
 end
 
 function gradient_hessian!(
-    g::AbstractVector, h::AbstractVector, ::MAELoss,
-    y::AbstractVector, pred::AbstractVector, _scratch,
+    g::AbstractVector,
+    h::AbstractVector,
+    ::MAELoss,
+    y::AbstractVector,
+    pred::AbstractVector,
+    _scratch,
 )
     @. g = sign(y - pred)
     fill!(h, 1.0)
@@ -130,8 +138,12 @@ function gradient_hessian!(
 end
 
 function gradient_hessian!(
-    g::AbstractVector, h::AbstractVector, ::LoglossLoss,
-    y::AbstractVector, pred::AbstractVector, scratch::AbstractVector,
+    g::AbstractVector,
+    h::AbstractVector,
+    ::LoglossLoss,
+    y::AbstractVector,
+    pred::AbstractVector,
+    scratch::AbstractVector,
 )
     @. scratch = 1.0 / (1.0 + exp(-pred))
     @. g = y - scratch
@@ -140,8 +152,12 @@ function gradient_hessian!(
 end
 
 function gradient_hessian!(
-    g::AbstractMatrix, h::AbstractMatrix, ::MultiClassLoss,
-    y_onehot::AbstractMatrix, pred::AbstractMatrix, scratch::AbstractMatrix,
+    g::AbstractMatrix,
+    h::AbstractMatrix,
+    ::MultiClassLoss,
+    y_onehot::AbstractMatrix,
+    pred::AbstractMatrix,
+    scratch::AbstractMatrix,
 )
     _softmax_matrix!(scratch, pred)
     @. g = y_onehot - scratch
@@ -151,9 +167,9 @@ end
 
 function make_loss(name::AbstractString; n_classes::Int=2)
     upper = uppercase(name)
-    upper == "RMSE"       && return RMSELoss()
-    upper == "MAE"        && return MAELoss()
+    upper == "RMSE" && return RMSELoss()
+    upper == "MAE" && return MAELoss()
     upper in ("LOGLOSS", "CROSSENTROPY") && return LoglossLoss()
     upper in ("MULTICLASS", "MULTILOGLOSS") && return MultiClassLoss(n_classes)
-    error("Unknown loss function: $name. Supported: RMSE, MAE, Logloss, MultiClass")
+    return error("Unknown loss function: $name. Supported: RMSE, MAE, Logloss, MultiClass")
 end

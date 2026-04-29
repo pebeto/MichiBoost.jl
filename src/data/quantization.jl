@@ -2,9 +2,7 @@ function quantize_features(numerical_data::Matrix{Float64}; border_count::Int=25
     n_samples, n_features = size(numerical_data)
     if n_features == 0
         return QuantizedFeatures(
-            Matrix{UInt16}(undef, n_samples, 0),
-            Vector{Float64}[],
-            Int[],
+            Matrix{UInt16}(undef, n_samples, 0), Vector{Float64}[], Int[]
         )
     end
 
@@ -48,11 +46,7 @@ end
 # Function-barrier helper.  Split out so the threaded body gets compiled
 # against concrete types and doesn't box `lo` / `v` through the closure.
 @inline function _apply_borders_column!(
-    bins::Matrix{UInt16},
-    data::Matrix{Float64},
-    b::Vector{Float64},
-    j::Int,
-    n_samples::Int,
+    bins::Matrix{UInt16}, data::Matrix{Float64}, b::Vector{Float64}, j::Int, n_samples::Int
 )
     nb = length(b)
     if nb <= 32

@@ -22,13 +22,14 @@ function _shap_tree!(
         lo = path_prefix << (bit_pos + 1)  # 0-indexed start of current subtree
 
         # Path-conditioned means: average only over leaves reachable from here.
-        sum_left  = sum(@view tree.leaf_values[lo+1      : lo+half])
-        sum_right = sum(@view tree.leaf_values[lo+half+1 : lo+2*half])
-        mean_left  = sum_left  / half
+        sum_left = sum(@view tree.leaf_values[(lo + 1):(lo + half)])
+        sum_right = sum(@view tree.leaf_values[(lo + half + 1):(lo + 2 * half)])
+        mean_left = sum_left / half
         mean_right = sum_right / half
 
         went_right = (leaf_idx >> bit_pos) & 1
-        contribution = lr * (went_right == 1 ? mean_right - mean_left : mean_left - mean_right) / 2.0
+        delta = went_right == 1 ? mean_right - mean_left : mean_left - mean_right
+        contribution = lr * delta / 2.0
 
         feat_idx = tree.split_feature_indices[k]
         orig_col = if tree.split_feature_types[k] == :numerical

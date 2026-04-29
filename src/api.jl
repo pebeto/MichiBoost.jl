@@ -48,8 +48,8 @@ Accepts the same keyword arguments as `MichiBoostRegressor`, plus:
 ```julia
 model = MichiBoostClassifier(; iterations=200, depth=4)
 fit!(model, X, y)
-probs  = predict_proba(model, X_test)   # probabilities
-labels = predict(model, X_test)          # class labels
+probs = predict_proba(model, X_test)   # probabilities
+labels = predict(model, X_test)        # class labels
 ```
 """
 function MichiBoostClassifier(; kwargs...)
@@ -160,18 +160,18 @@ Generate predictions from a trained model.
 ```
 """
 function predict(
-    m::MichiBoostWrapper,
-    data;
-    prediction_type::String="Class",
-    cat_features=nothing,
+    m::MichiBoostWrapper, data; prediction_type::String="Class", cat_features=nothing
 )
     m.model === nothing && error("Model has not been trained. Call fit! first.")
     pool = data isa Pool ? data : Pool(data; cat_features)
 
     prediction_type == "RawFormulaVal" && return _predict_raw(m.model, pool)
     prediction_type == "Probability" && return MichiBoost.predict(m.model, pool)
-    return m isa MichiBoostClassifier ? predict_classes(m.model, pool) :
-           MichiBoost.predict(m.model, pool)
+    return if m isa MichiBoostClassifier
+        predict_classes(m.model, pool)
+    else
+        MichiBoost.predict(m.model, pool)
+    end
 end
 
 """
@@ -261,9 +261,9 @@ end
 @inline function _predict_chunk!(preds, trees, num_bins, cat_enc, lr, lo, hi)
     chunk = hi - lo + 1
     leaf_buf = Vector{Int}(undef, chunk)
-    pv   = view(preds,    lo:hi)
-    nbv  = view(num_bins, lo:hi, :)
-    cev  = view(cat_enc,  lo:hi, :)
+    pv = view(preds, lo:hi)
+    nbv = view(num_bins, lo:hi, :)
+    cev = view(cat_enc, lo:hi, :)
     for tree in trees
         predict_tree!(pv, tree, nbv, cev, lr, leaf_buf)
     end
@@ -273,9 +273,9 @@ end
 @inline function _predict_chunk_mc!(preds, trees, num_bins, cat_enc, lr, lo, hi)
     chunk = hi - lo + 1
     leaf_buf = Vector{Int}(undef, chunk)
-    pv   = view(preds,    lo:hi, :)
-    nbv  = view(num_bins, lo:hi, :)
-    cev  = view(cat_enc,  lo:hi, :)
+    pv = view(preds, lo:hi, :)
+    nbv = view(num_bins, lo:hi, :)
+    cev = view(cat_enc, lo:hi, :)
     for tree in trees
         predict_tree!(pv, tree, nbv, cev, lr, leaf_buf)
     end
@@ -315,14 +315,17 @@ original class labels for classification).
 # Example
 ```julia
 acc = score(clf, X_test, y_test)
-r2  = score(reg, X_test, y_test)
+r2 = score(reg, X_test, y_test)
 ```
 """
 function score(m::MichiBoostWrapper, data, y; cat_features=nothing)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
     pool = data isa Pool ? data : Pool(data; cat_features)
-    length(y) == pool.n_samples ||
-        throw(DimensionMismatch("`y` has $(length(y)) entries but `data` has $(pool.n_samples) rows"))
+    length(y) == pool.n_samples || throw(
+        DimensionMismatch(
+            "`y` has $(length(y)) entries but `data` has $(pool.n_samples) rows"
+        ),
+    )
     ŷ = predict(m, pool)
     return _score(m, y, ŷ)
 end
@@ -386,7 +389,7 @@ See also `load_model`.
 """
 function save_model(m::MichiBoostWrapper, filepath::AbstractString)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
-    save_model(m.model, filepath)
+    return save_model(m.model, filepath)
 end
 
 """
@@ -403,8 +406,52 @@ predict(loaded, X_test)  # works with the raw MichiBoostModel
 """
 function load_model end  # Actual method in io.jl
 
+function _kfold_folds(n::Int, fold_count::Int, shuffle::Bool, rng::AbstractRNG)
+    indices = shuffle ? randperm(rng, n) : collect(1:n)
+    fold_size = n ÷ fold_count
+    folds = Vector{Vector{Int}}(undef, fold_count)
+    for k in 1:fold_count
+        ts = (k - 1) * fold_size + 1
+        te = k == fold_count ? n : k * fold_size
+        folds[k] = collect(indices[ts:te])
+    end
+    return folds
+end
+
+function _stratified_folds(
+    label::AbstractVector, fold_count::Int, shuffle::Bool, rng::AbstractRNG
+)
+    folds = [Int[] for _ in 1:fold_count]
+    classes = unique(label)
+    for c in classes
+        c_idx = findall(==(c), label)
+        if length(c_idx) < fold_count
+            error(
+                "Stratified CV requires every class to have at least `fold_count` " *
+                "samples; class `$c` has $(length(c_idx)) but `fold_count=$fold_count`. " *
+                "Stratified CV is intended for classification labels — for continuous " *
+                "targets use `stratified=false`.",
+            )
+        end
+        if shuffle
+            shuffle!(rng, c_idx)
+        end
+        # Round-robin distribute this class's samples across folds so each fold
+        # receives ⌈n_c / fold_count⌉ or ⌊n_c / fold_count⌋ samples of class c.
+        for (k, idx) in enumerate(c_idx)
+            push!(folds[((k - 1) % fold_count) + 1], idx)
+        end
+    end
+    if shuffle
+        for k in 1:fold_count
+            shuffle!(rng, folds[k])
+        end
+    end
+    return folds
+end
+
 """
-    cv(pool::Pool; params=Dict(), fold_count=3, shuffle=true,
+    cv(pool::Pool; params=Dict(), fold_count=3, shuffle=true, stratified=false,
        random_seed=0, verbose=false, kwargs...) -> NamedTuple
 
 Perform k-fold cross-validation on the given `Pool`.
@@ -414,6 +461,9 @@ Perform k-fold cross-validation on the given `Pool`.
 - `params` — `Dict` of training hyperparameters (string or symbol keys).
 - `fold_count` — number of folds.
 - `shuffle` — whether to shuffle indices before splitting.
+- `stratified` — if `true`, each fold preserves the class proportions of the
+  full label vector. Requires every class to have at least `fold_count`
+  samples; intended for classification labels.
 - `random_seed` — seed for the shuffle.
 - `verbose` — print per-fold results.
 - `kwargs...` — additional hyperparameters (merged with `params`).
@@ -428,7 +478,7 @@ A `NamedTuple` with fields:
 # Example
 ```julia
 pool = Pool(X; label=y)
-result = cv(pool; fold_count=5,
+result = cv(pool; fold_count=5, stratified=true,
             params=Dict("iterations" => 100, "depth" => 4))
 println("Mean test loss: ", result.mean_test_loss)
 ```
@@ -438,6 +488,7 @@ function cv(
     params=Dict(),
     fold_count::Int=3,
     shuffle::Bool=true,
+    stratified::Bool=false,
     random_seed::Int=0,
     verbose::Bool=false,
     kwargs...,
@@ -453,17 +504,18 @@ function cv(
     label = get_label(pool)
     n = pool.n_samples
     rng = MersenneTwister(random_seed)
-    indices = shuffle ? randperm(rng, n) : collect(1:n)
-    fold_size = n ÷ fold_count
+    folds = if stratified
+        _stratified_folds(label, fold_count, shuffle, rng)
+    else
+        _kfold_folds(n, fold_count, shuffle, rng)
+    end
     loss_fn = get(all_params, :loss_function, "RMSE")
 
     train_losses, test_losses = Float64[], Float64[]
 
     for fold in 1:fold_count
-        ts = (fold - 1) * fold_size + 1
-        te = fold == fold_count ? n : fold * fold_size
-        test_idx = indices[ts:te]
-        train_idx = vcat(indices[1:(ts - 1)], indices[(te + 1):end])
+        test_idx = folds[fold]
+        train_idx = reduce(vcat, (folds[k] for k in 1:fold_count if k != fold))
 
         train_pool = slice(pool, train_idx)
         test_pool = slice(pool, test_idx)
@@ -484,7 +536,7 @@ function cv(
         )
 
         lf = make_loss(String(loss_fn))
-        
+
         if model.is_multiclass
             train_logits = _predict_raw(model, train_pool)
             test_logits = _predict_raw(model, test_pool)
@@ -522,14 +574,15 @@ function cv(
                 0.0
             end
             # Blend in uniform-prior loss for unseen samples
-            test_loss = (base_test_loss * seen_count + unseen_loss * unseen_count) / length(test_y)
+            test_loss =
+                (base_test_loss * seen_count + unseen_loss * unseen_count) / length(test_y)
 
             push!(train_losses, loss(lf, train_y_onehot, train_logits))
             push!(test_losses, test_loss)
         elseif model.n_classes == 2
             train_logits = _predict_raw(model, train_pool)
             test_logits = _predict_raw(model, test_pool)
-            
+
             push!(train_losses, loss(lf, get_label(train_pool), train_logits))
             push!(test_losses, loss(lf, get_label(test_pool), test_logits))
         else
@@ -553,4 +606,3 @@ function cv(
         mean_test_loss=mean(test_losses),
     )
 end
-

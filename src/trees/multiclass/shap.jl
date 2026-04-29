@@ -30,12 +30,12 @@ function _shap_tree!(
         went_right = (leaf_idx >> bit_pos) & 1
 
         for c in 1:n_classes
-            sum_left  = sum(@view tree.leaf_values[lo+1      : lo+half,    c])
-            sum_right = sum(@view tree.leaf_values[lo+half+1 : lo+2*half,  c])
-            mean_left  = sum_left  / half
+            sum_left = sum(@view tree.leaf_values[(lo + 1):(lo + half), c])
+            sum_right = sum(@view tree.leaf_values[(lo + half + 1):(lo + 2 * half), c])
+            mean_left = sum_left / half
             mean_right = sum_right / half
-            contribution = lr * (went_right == 1 ? mean_right - mean_left : mean_left - mean_right) / 2.0
-            shap_row[orig_col, c] += contribution
+            delta = went_right == 1 ? mean_right - mean_left : mean_left - mean_right
+            shap_row[orig_col, c] += lr * delta / 2.0
         end
 
         path_prefix = (path_prefix << 1) | went_right

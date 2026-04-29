@@ -37,6 +37,4 @@ makedocs(;
     remotes=nothing,
 )
 
-deploydocs(;
-    repo="github.com/pebeto/MichiBoost.jl",
-)
+deploydocs(; repo="github.com/pebeto/MichiBoost.jl")

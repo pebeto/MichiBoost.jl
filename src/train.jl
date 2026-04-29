@@ -25,7 +25,7 @@ function train(
     qf = quantize_features(pool.features_numerical; border_count)
 
     is_classification = uppercase(loss_function) in
-                        ("LOGLOSS", "CROSSENTROPY", "MULTICLASS", "MULTILOGLOSS")
+    ("LOGLOSS", "CROSSENTROPY", "MULTICLASS", "MULTILOGLOSS")
     is_multiclass = uppercase(loss_function) in ("MULTICLASS", "MULTILOGLOSS")
 
     class_labels = Float64[]
@@ -69,12 +69,7 @@ function train(
     permutation = randperm(rng, n_samples)
     cat_encoded, encoder = if n_cat > 0
         if boosting_type == "Ordered"
-            compute_ordered_target_stats(
-                pool.features_categorical,
-                y,
-                permutation;
-                alpha=1.0,
-            )
+            compute_ordered_target_stats(pool.features_categorical, y, permutation; alpha=1.0)
         else
             plain_target_encode(pool.features_categorical, y)
         end
@@ -107,20 +102,26 @@ function train(
     # so the buffer must accommodate both numerical bins and categorical ranks.
     max_bins = max(border_count + 2, n_samples + 1)
     nt = Threads.maxthreadid()
-    buffers = is_multiclass ?
-        [SplitBuffersMC(max_leaves, max_bins, n_classes, n_samples) for _ in 1:nt] :
+    buffers = if is_multiclass
+        [SplitBuffersMC(max_leaves, max_bins, n_classes, n_samples) for _ in 1:nt]
+    else
         [SplitBuffers(max_leaves, max_bins, n_samples) for _ in 1:nt]
+    end
 
     # Cut points per categorical feature — at low raw cardinality ordered
     # target statistics produce up to n_samples distinct encoded values, which
     # would make per-iteration histogram work O(n_samples).  Capping at
     # border_count+1 matches how numerical features are handled and keeps the
     # per-feature bin count bounded regardless of raw cardinality.
-    cat_sorted_vals = [_quantile_cut_points(view(cat_encoded, :, j), border_count + 1) for j in 1:n_cat]
+    cat_sorted_vals = [
+        _quantile_cut_points(view(cat_encoded, :, j), border_count + 1) for j in 1:n_cat
+    ]
 
-    hist_cache = is_multiclass ?
-        HistCacheMC(max_leaves, qf.n_bins, cat_sorted_vals, n_classes) :
+    hist_cache = if is_multiclass
+        HistCacheMC(max_leaves, qf.n_bins, cat_sorted_vals, n_classes)
+    else
         HistCache(max_leaves, qf.n_bins, cat_sorted_vals)
+    end
 
     leaf_indices = Vector{Int}(undef, n_samples)
 
@@ -130,7 +131,7 @@ function train(
     # made ES O(T²) across a run.
     es_active = early_stopping_rounds !== nothing && eval_pool !== nothing
     eval_num_bins = Matrix{UInt16}(undef, 0, 0)
-    eval_cat_enc  = Matrix{Float64}(undef, 0, 0)
+    eval_cat_enc = Matrix{Float64}(undef, 0, 0)
     eval_preds_vec = Float64[]
     eval_preds_mat = Matrix{Float64}(undef, 0, 0)
     eval_y_vec = Float64[]
@@ -138,12 +139,16 @@ function train(
     eval_leaf_indices = Int[]
     if es_active
         n_eval = eval_pool.n_samples
-        eval_num_bins = n_numerical(eval_pool) > 0 ?
-            apply_borders(eval_pool.features_numerical, qf.borders) :
+        eval_num_bins = if n_numerical(eval_pool) > 0
+            apply_borders(eval_pool.features_numerical, qf.borders)
+        else
             Matrix{UInt16}(undef, n_eval, 0)
-        eval_cat_enc = n_categorical(eval_pool) > 0 && encoder !== nothing ?
-            encode_categorical(encoder, eval_pool.features_categorical) :
+        end
+        eval_cat_enc = if n_categorical(eval_pool) > 0 && encoder !== nothing
+            encode_categorical(encoder, eval_pool.features_categorical)
+        else
             Matrix{Float64}(undef, n_eval, 0)
+        end
         eval_leaf_indices = Vector{Int}(undef, n_eval)
         eval_y_raw = get_label(eval_pool)
         if is_multiclass
@@ -164,15 +169,21 @@ function train(
     # allocates an O(n × n_classes) matrix (or O(n) vector) 4-6 times per
     # iteration for gradient / hessian / softmax temporaries, which on
     # n=40k × k=7 adds up to ~100 MB / iter.
-    grads_buf = is_multiclass ?
-        Matrix{Float64}(undef, n_samples, n_classes) :
+    grads_buf = if is_multiclass
+        Matrix{Float64}(undef, n_samples, n_classes)
+    else
         Vector{Float64}(undef, n_samples)
-    hess_buf = is_multiclass ?
-        Matrix{Float64}(undef, n_samples, n_classes) :
+    end
+    hess_buf = if is_multiclass
+        Matrix{Float64}(undef, n_samples, n_classes)
+    else
         Vector{Float64}(undef, n_samples)
-    scratch_buf = is_multiclass ?
-        Matrix{Float64}(undef, n_samples, n_classes) :
+    end
+    scratch_buf = if is_multiclass
+        Matrix{Float64}(undef, n_samples, n_classes)
+    else
         Vector{Float64}(undef, n_samples)
+    end
     use_refine = lf isa MAELoss
     refine_buf = use_refine ? Vector{Float64}(undef, n_samples) : Float64[]
 
@@ -180,7 +191,7 @@ function train(
         if is_multiclass
             gradient_hessian!(grads_buf, hess_buf, lf, y_onehot, predictions, scratch_buf)
             @. grads_buf *= weights
-            @. hess_buf  *= weights
+            @. hess_buf *= weights
             tree = build_symmetric_tree(
                 grads_buf,
                 hess_buf,
@@ -201,11 +212,13 @@ function train(
                 hist_cache=hist_cache::HistCacheMC,
             )
             push!(trees, tree)
-            predict_tree!(predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices)
+            predict_tree!(
+                predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices
+            )
         else
             gradient_hessian!(grads_buf, hess_buf, lf, y, predictions, scratch_buf)
             @. grads_buf *= weights
-            @. hess_buf  *= weights
+            @. hess_buf *= weights
             # MAE is non-smooth: surrogate gradients (±1) drive split-finding,
             # but leaf values must come from the residual weighted median —
             # otherwise each round can shift predictions by at most
@@ -230,32 +243,49 @@ function train(
                 buffers=buffers::Vector{SplitBuffers},
                 cat_sorted_vals,
                 hist_cache=hist_cache::HistCache,
-                leaf_refine_values  = use_refine ? refine_buf : nothing,
-                leaf_refine_weights = use_refine ? weights    : nothing,
+                leaf_refine_values=use_refine ? refine_buf : nothing,
+                leaf_refine_weights=use_refine ? weights : nothing,
             )
             push!(trees, tree)
-            predict_tree!(predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices)
+            predict_tree!(
+                predictions, tree, qf.bins, cat_encoded, learning_rate, leaf_indices
+            )
         end
 
-        if verbose && (iter % max(1, iterations ÷ 10) == 0 || iter == 1 || iter == iterations)
+        if verbose &&
+            (iter % max(1, iterations ÷ 10) == 0 || iter == 1 || iter == iterations)
             train_loss = if is_multiclass
                 loss(lf, y_onehot, predictions)
             else
                 loss(lf, y, predictions)
             end
-            println("Iteration $iter/$iterations, train loss: $(round(train_loss; digits=6))")
+            println(
+                "Iteration $iter/$iterations, train loss: $(round(train_loss; digits=6))"
+            )
         end
 
         if es_active
             # Extend the running eval predictions with the just-built tree
             # so we only pay O(1) tree-prediction per ES check.
             if is_multiclass
-                predict_tree!(eval_preds_mat, tree, eval_num_bins, eval_cat_enc,
-                              learning_rate, eval_leaf_indices)
+                predict_tree!(
+                    eval_preds_mat,
+                    tree,
+                    eval_num_bins,
+                    eval_cat_enc,
+                    learning_rate,
+                    eval_leaf_indices,
+                )
                 eval_loss = loss(lf, eval_y_onehot, eval_preds_mat)
             else
-                predict_tree!(eval_preds_vec, tree, eval_num_bins, eval_cat_enc,
-                              learning_rate, eval_leaf_indices)
+                predict_tree!(
+                    eval_preds_vec,
+                    tree,
+                    eval_num_bins,
+                    eval_cat_enc,
+                    learning_rate,
+                    eval_leaf_indices,
+                )
                 eval_loss = loss(lf, eval_y_vec, eval_preds_vec)
             end
             if eval_loss < best_eval_loss
@@ -290,4 +320,3 @@ function train(
         pool.categorical_feature_indices,
     )
 end
-

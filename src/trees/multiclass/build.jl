@@ -14,8 +14,9 @@ function build_symmetric_tree(
     rsm::Float64=1.0,
     rng::AbstractRNG=MersenneTwister(),
     buffers::Vector{SplitBuffersMC}=[
-        SplitBuffersMC(1 << depth, maximum(qf.n_bins; init=1) + 1, n_classes, length(sample_indices))
-        for _ in 1:Threads.maxthreadid()
+        SplitBuffersMC(
+            1 << depth, maximum(qf.n_bins; init=1) + 1, n_classes, length(sample_indices)
+        ) for _ in 1:Threads.maxthreadid()
     ],
     cat_sorted_vals::Vector{Vector{Float64}}=Vector{Vector{Float64}}(),
     hist_cache::HistCacheMC=HistCacheMC(1 << depth, qf.n_bins, cat_sorted_vals, n_classes),
@@ -75,17 +76,21 @@ function build_symmetric_tree(
                 leaf_values[l, c] = 0.0
             end
         else
-            _fill_leaf_values_mc!(leaf_values, l, group, gradients, hessians, n_classes, l2_leaf_reg)
+            _fill_leaf_values_mc!(
+                leaf_values, l, group, gradients, hessians, n_classes, l2_leaf_reg
+            )
         end
     end
-    return SymmetricTreeMultiClass(depth, split_features, split_types, split_thresholds, leaf_values)
+    return SymmetricTreeMultiClass(
+        depth, split_features, split_types, split_thresholds, leaf_values
+    )
 end
 
 # Function-barrier helper for the multiclass Newton step: without this, the
 # @threads closure captures g_sum / h_sum in a Core.Box and every `+=`
 # allocates a fresh boxed Float64 — up to ~1.1M per boosting round.
 @inline function _fill_leaf_values_mc!(
-    leaf_values, l, group, gradients, hessians, n_classes, l2_leaf_reg,
+    leaf_values, l, group, gradients, hessians, n_classes, l2_leaf_reg
 )
     n_leaf = length(group)
     @inbounds for c in 1:n_classes

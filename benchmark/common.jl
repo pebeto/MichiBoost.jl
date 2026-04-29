@@ -52,34 +52,61 @@ function train_test_split(X::AbstractMatrix, y::AbstractVector; ratio=0.8, seed=
     rng = MersenneTwister(seed)
     idx = randperm(rng, length(y))
     n_tr = round(Int, ratio * length(y))
-    tr, te = idx[1:n_tr], idx[n_tr+1:end]
+    tr, te = idx[1:n_tr], idx[(n_tr + 1):end]
     return X[tr, :], y[tr], X[te, :], y[te]
 end
 
 # CatBoost / MichiBoost training wrappers
 
 function cb_train(X, y; loss="RMSE", cb_pool=nothing, iterations=ITERS)
-    pool = cb_pool !== nothing ? cb_pool : CatBoost.Pool(data=np.array(X), label=np.array(y))
+    pool =
+        cb_pool !== nothing ? cb_pool : CatBoost.Pool(; data=np.array(X), label=np.array(y))
     is_reg = loss in ("RMSE", "MAE")
-    m = is_reg ?
-        CatBoost.CatBoostRegressor(
-            iterations=iterations, learning_rate=LR, depth=DEPTH,
-            random_seed=SEED, verbose=false, loss_function=loss,
-            thread_count=N_THREADS) :
-        CatBoost.CatBoostClassifier(
-            iterations=iterations, learning_rate=LR, depth=DEPTH,
-            random_seed=SEED, verbose=false, loss_function=loss,
-            thread_count=N_THREADS)
+    m = if is_reg
+        CatBoost.CatBoostRegressor(;
+        iterations=iterations,
+        learning_rate=LR,
+        depth=DEPTH,
+        random_seed=SEED,
+        verbose=false,
+        loss_function=loss,
+        thread_count=N_THREADS,
+    )
+    else
+        CatBoost.CatBoostClassifier(;
+        iterations=iterations,
+        learning_rate=LR,
+        depth=DEPTH,
+        random_seed=SEED,
+        verbose=false,
+        loss_function=loss,
+        thread_count=N_THREADS,
+    )
+    end
     CatBoost.fit!(m, pool)
     return m
 end
 
 function mb_train(data, y; loss="RMSE", iterations=ITERS)
-    m = loss in ("RMSE", "MAE") ?
-        MichiBoostRegressor(; iterations=iterations, learning_rate=LR, depth=DEPTH,
-            loss_function=loss, random_seed=SEED, verbose=false) :
-        MichiBoostClassifier(; iterations=iterations, learning_rate=LR, depth=DEPTH,
-            loss_function=loss, random_seed=SEED, verbose=false)
+    m = if loss in ("RMSE", "MAE")
+        MichiBoostRegressor(;
+        iterations=iterations,
+        learning_rate=LR,
+        depth=DEPTH,
+        loss_function=loss,
+        random_seed=SEED,
+        verbose=false,
+    )
+    else
+        MichiBoostClassifier(;
+        iterations=iterations,
+        learning_rate=LR,
+        depth=DEPTH,
+        loss_function=loss,
+        random_seed=SEED,
+        verbose=false,
+    )
+    end
     MichiBoost.fit!(m, data, y)
     return m
 end
@@ -87,15 +114,16 @@ end
 function make_cat_frames(X_num, X_cat, y)
     cat_names = ["cat$i" for i in 1:size(X_cat, 2)]
     num_names = ["num$i" for i in 1:size(X_num, 2)]
-    py_df = pd.DataFrame(pydict(merge(
-        Dict(cat_names[i] => X_cat[:, i] for i in eachindex(cat_names)),
-        Dict(num_names[i] => X_num[:, i] for i in eachindex(num_names)),
-    )))
-    jl_df = hcat(
-        DataFrame(X_cat, cat_names),
-        DataFrame(X_num, num_names),
+    py_df = pd.DataFrame(
+        pydict(
+            merge(
+                Dict(cat_names[i] => X_cat[:, i] for i in eachindex(cat_names)),
+                Dict(num_names[i] => X_num[:, i] for i in eachindex(num_names)),
+            ),
+        ),
     )
-    cb_pool = CatBoost.Pool(data=py_df, label=np.array(y), cat_features=cat_names)
+    jl_df = hcat(DataFrame(X_cat, cat_names), DataFrame(X_num, num_names))
+    cb_pool = CatBoost.Pool(; data=py_df, label=np.array(y), cat_features=cat_names)
     jl_pool = MichiBoost.Pool(jl_df; label=y)
     return py_df, jl_df, cb_pool, jl_pool, cat_names
 end

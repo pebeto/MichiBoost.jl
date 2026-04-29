@@ -49,7 +49,7 @@ end
 function load_covertype(n_samples::Int)
     csv_path = download_covertype()
     df = CSV.read(csv_path, DataFrame; header=false)
-    X = Matrix{Float64}(df[:, 1:end-1])
+    X = Matrix{Float64}(df[:, 1:(end - 1)])
     y = Vector{Float64}(df[:, end])
     n = min(n_samples, size(X, 1))
     idx = shuffle(MersenneTwister(SEED), 1:size(X, 1))[1:n]
@@ -58,19 +58,40 @@ end
 
 function run_once(X_tr, y_tr, X_te, y_te)
     jl_pool_tr = MichiBoost.Pool(X_tr; label=y_tr)
-    cb_pool_tr = CatBoost.Pool(data=np.array(X_tr), label=np.array(y_tr))
+    cb_pool_tr = CatBoost.Pool(; data=np.array(X_tr), label=np.array(y_tr))
     X_te_np = np.array(X_te)
 
-    mb_fn = () -> MichiBoostClassifier(; iterations=ITERS, learning_rate=LR, depth=DEPTH,
-                      random_seed=SEED, verbose=false)
-    cb_fn = () -> CatBoost.CatBoostClassifier(iterations=ITERS, learning_rate=LR, depth=DEPTH,
-                      random_seed=SEED, thread_count=N_THREADS, verbose=false)
+    mb_fn =
+        () -> MichiBoostClassifier(;
+            iterations=ITERS,
+            learning_rate=LR,
+            depth=DEPTH,
+            random_seed=SEED,
+            verbose=false,
+        )
+    cb_fn =
+        () -> CatBoost.CatBoostClassifier(;
+            iterations=ITERS,
+            learning_rate=LR,
+            depth=DEPTH,
+            random_seed=SEED,
+            thread_count=N_THREADS,
+            verbose=false,
+        )
 
-    t_mb = median(@benchmark(MichiBoost.fit!($mb_fn(), $jl_pool_tr), samples=3, evals=1)).time / 1e6
-    t_cb = median(@benchmark(CatBoost.fit!($cb_fn(), $cb_pool_tr), samples=3, evals=1)).time / 1e6
+    t_mb =
+        median(
+            @benchmark(MichiBoost.fit!($mb_fn(), $jl_pool_tr), samples = 3, evals = 1)
+        ).time / 1e6
+    t_cb =
+        median(
+            @benchmark(CatBoost.fit!($cb_fn(), $cb_pool_tr), samples = 3, evals = 1)
+        ).time / 1e6
 
-    mb = mb_fn(); MichiBoost.fit!(mb, jl_pool_tr)
-    cb = cb_fn(); CatBoost.fit!(cb, cb_pool_tr)
+    mb = mb_fn()
+    MichiBoost.fit!(mb, jl_pool_tr)
+    cb = cb_fn()
+    CatBoost.fit!(cb, cb_pool_tr)
 
     mb_acc = mean(MichiBoost.predict(mb, X_te) .== y_te)
     cb_acc = mean(pyconvert(Vector{Float64}, CatBoost.predict(cb, X_te_np)) .== y_te)
@@ -83,24 +104,31 @@ end
 
 if SWEEP && !CHILD
     # Parent mode: spawn a child per thread count, parse its RESULT line.
-    results = Dict{Int, NamedTuple}()
+    results = Dict{Int,NamedTuple}()
     script = @__FILE__
     for t in THREAD_COUNTS
         println("\n>>> Spawning child with -t $t ...")
-        cmd = Cmd(`julia --project=benchmark -t $t $script --n=$SUBSET_N`;
-                  env=merge(ENV, Dict("MB_SCALING_CHILD" => "1")))
+        cmd = Cmd(
+            `julia --project=benchmark -t $t $script --n=$SUBSET_N`;
+            env=merge(ENV, Dict("MB_SCALING_CHILD" => "1")),
+        )
         output = read(cmd, String)
         print(output)
         for line in split(output, '\n')
             if startswith(line, "RESULT ")
                 kv = Dict{String,Float64}()
-                for pair in split(strip(line[length("RESULT ")+1:end]))
+                for pair in split(strip(line[(length("RESULT ") + 1):end]))
                     k, v = split(pair, "=")
                     kv[k] = parse(Float64, v)
                 end
-                results[t] = (; t_mb=kv["t_mb"], t_cb=kv["t_cb"],
-                              t_mb_pred=kv["t_mb_pred"], t_cb_pred=kv["t_cb_pred"],
-                              mb_acc=kv["mb_acc"], cb_acc=kv["cb_acc"])
+                results[t] = (;
+                    t_mb=kv["t_mb"],
+                    t_cb=kv["t_cb"],
+                    t_mb_pred=kv["t_mb_pred"],
+                    t_cb_pred=kv["t_cb_pred"],
+                    mb_acc=kv["mb_acc"],
+                    cb_acc=kv["cb_acc"],
+                )
             end
         end
     end
@@ -114,14 +142,18 @@ if SWEEP && !CHILD
         haskey(results, t) || continue
         r = results[t]
         rel = base_mb === nothing ? "-" : "$(round(base_mb.t_mb / r.t_mb; digits=2))x"
-        println("  $(lpad(t, 3))         $(rpad(round(r.t_mb; digits=1), 10))ms      $(rpad(round(r.t_cb; digits=1), 10))ms    $rel")
+        println(
+            "  $(lpad(t, 3))         $(rpad(round(r.t_mb; digits=1), 10))ms      $(rpad(round(r.t_cb; digits=1), 10))ms    $rel",
+        )
     end
     println()
     println("  Inference (median ms)")
     for t in THREAD_COUNTS
         haskey(results, t) || continue
         r = results[t]
-        println("  threads=$t   MichiBoost $(round(r.t_mb_pred; digits=3))ms   CatBoost $(round(r.t_cb_pred; digits=3))ms")
+        println(
+            "  threads=$t   MichiBoost $(round(r.t_mb_pred; digits=3))ms   CatBoost $(round(r.t_cb_pred; digits=3))ms",
+        )
     end
     exit(0)
 end
@@ -136,16 +168,24 @@ r = run_once(X_tr, y_tr, X_te, y_te)
 
 if CHILD
     # Emit one parseable line for the parent; keep human-readable output too.
-    println("RESULT threads=$N_THREADS t_mb=$(r.t_mb) t_cb=$(r.t_cb) " *
-            "t_mb_pred=$(r.t_mb_pred) t_cb_pred=$(r.t_cb_pred) " *
-            "mb_acc=$(r.mb_acc) cb_acc=$(r.cb_acc)")
+    println(
+        "RESULT threads=$N_THREADS t_mb=$(r.t_mb) t_cb=$(r.t_cb) " *
+        "t_mb_pred=$(r.t_mb_pred) t_cb_pred=$(r.t_cb_pred) " *
+        "mb_acc=$(r.mb_acc) cb_acc=$(r.cb_acc)",
+    )
 else
     println("\n", "="^72)
     println("SUMMARY  (Covertype, n=$SUBSET_N, 7 classes, $N_THREADS threads)")
     println("="^72)
-    println("  Training:  CatBoost $(round(r.t_cb; digits=1)) ms   MichiBoost $(round(r.t_mb; digits=1)) ms")
-    println("  Inference: CatBoost $(round(r.t_cb_pred; digits=3)) ms   MichiBoost $(round(r.t_mb_pred; digits=3)) ms")
-    println("  Accuracy:  CatBoost $(round(100*r.cb_acc; digits=2))%   MichiBoost $(round(100*r.mb_acc; digits=2))%")
+    println(
+        "  Training:  CatBoost $(round(r.t_cb; digits=1)) ms   MichiBoost $(round(r.t_mb; digits=1)) ms",
+    )
+    println(
+        "  Inference: CatBoost $(round(r.t_cb_pred; digits=3)) ms   MichiBoost $(round(r.t_mb_pred; digits=3)) ms",
+    )
+    println(
+        "  Accuracy:  CatBoost $(round(100*r.cb_acc; digits=2))%   MichiBoost $(round(100*r.mb_acc; digits=2))%",
+    )
     println()
     println("  Training speedup:  MB $(round(r.t_cb/r.t_mb; digits=2))x")
     println("  Inference speedup: MB $(round(r.t_cb_pred/r.t_mb_pred; digits=2))x")

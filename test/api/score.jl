@@ -9,9 +9,11 @@ using Test
     y = 2.0 .* X[:, 1] .- 1.5 .* X[:, 2] .+ 0.5 .* X[:, 3] .+ randn(n) .* 0.1
 
     X_train, y_train = X[1:800, :], y[1:800]
-    X_test,  y_test  = X[801:end, :], y[801:end]
+    X_test, y_test = X[801:end, :], y[801:end]
 
-    model = MichiBoostRegressor(; iterations=200, learning_rate=0.05, depth=4, verbose=false)
+    model = MichiBoostRegressor(;
+        iterations=200, learning_rate=0.05, depth=4, verbose=false
+    )
     fit!(model, X_train, y_train)
 
     s = score(model, X_test, y_test)
@@ -43,7 +45,7 @@ end
     y = Float64.(X[:, 1] .+ X[:, 2] .> 0)
 
     X_train, y_train = X[1:500, :], y[1:500]
-    X_test,  y_test  = X[501:end, :], y[501:end]
+    X_test, y_test = X[501:end, :], y[501:end]
 
     clf = MichiBoostClassifier(; iterations=200, learning_rate=0.05, depth=4, verbose=false)
     fit!(clf, X_train, y_train)
@@ -76,9 +78,11 @@ end
     y = mod.(1:n, 3)
 
     X_train, y_train = X[1:500, :], y[1:500]
-    X_test,  y_test  = X[501:end, :], y[501:end]
+    X_test, y_test = X[501:end, :], y[501:end]
 
-    clf = MichiBoostClassifier(; iterations=100, depth=3, loss_function="MultiClass", verbose=false)
+    clf = MichiBoostClassifier(;
+        iterations=100, depth=3, loss_function="MultiClass", verbose=false
+    )
     fit!(clf, X_train, y_train)
 
     s = score(clf, X_test, y_test)
@@ -97,7 +101,7 @@ end
     fit!(clf, pool)
 
     s_pool = score(clf, pool, y)
-    s_mat  = score(clf, X, y)
+    s_mat = score(clf, X, y)
     @test s_pool == s_mat
 end
 

@@ -45,6 +45,21 @@ println("Mean train loss: ", result.mean_train_loss)
 println("Mean test loss:  ", result.mean_test_loss)
 ```
 
+For classification on imbalanced data, pass `stratified=true` so each fold
+preserves the global class proportions:
+
+```julia
+result = cv(
+    pool;
+    fold_count=5,
+    stratified=true,
+    params=Dict("iterations" => 100, "depth" => 4,
+                "loss_function" => "Logloss"),
+)
+```
+
+Stratified CV requires every class to have at least `fold_count` samples.
+
 The returned `NamedTuple` exposes `train_loss`, `test_loss`, `mean_train_loss`,
 and `mean_test_loss`. Keys in `params` may be strings or symbols. The loss
 function used is taken from `params[:loss_function]` (default `"RMSE"`).

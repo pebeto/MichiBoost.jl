@@ -56,8 +56,7 @@ function plain_target_encode(cat_features::Vector{Vector{UInt32}}, y::Vector{Flo
 end
 
 function encode_categorical(
-    encoder::OrderedTargetEncoder,
-    cat_features::Vector{Vector{UInt32}},
+    encoder::OrderedTargetEncoder, cat_features::Vector{Vector{UInt32}}
 )
     n_cat = length(cat_features)
     if n_cat == 0
@@ -69,7 +68,8 @@ function encode_categorical(
     for f in 1:n_cat, i in 1:n_samples
         cat_id = cat_features[f][i]
         sum_target, count = get(encoder.category_stats[f], cat_id, (0.0, 0))
-        encoded[i, f] = (sum_target + encoder.alpha * encoder.prior) / (count + encoder.alpha)
+        encoded[i, f] =
+            (sum_target + encoder.alpha * encoder.prior) / (count + encoder.alpha)
     end
     return encoded
 end

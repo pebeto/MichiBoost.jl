@@ -38,13 +38,7 @@ function Pool(
     group_id=nothing,
 )
     return _build_pool(
-        data;
-        label,
-        cat_features,
-        text_features,
-        feature_names,
-        weight,
-        group_id,
+        data; label, cat_features, text_features, feature_names, weight, group_id
     )
 end
 
@@ -58,13 +52,7 @@ function Pool(;
     group_id=nothing,
 )
     return _build_pool(
-        data;
-        label,
-        cat_features,
-        text_features,
-        feature_names,
-        weight,
-        group_id,
+        data; label, cat_features, text_features, feature_names, weight, group_id
     )
 end
 

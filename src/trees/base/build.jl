@@ -13,8 +13,8 @@ function build_symmetric_tree(
     rsm::Float64=1.0,
     rng::AbstractRNG=MersenneTwister(),
     buffers::Vector{SplitBuffers}=[
-        SplitBuffers(1 << depth, maximum(qf.n_bins; init=1) + 1, length(sample_indices))
-        for _ in 1:Threads.maxthreadid()
+        SplitBuffers(1 << depth, maximum(qf.n_bins; init=1) + 1, length(sample_indices)) for
+        _ in 1:Threads.maxthreadid()
     ],
     cat_sorted_vals::Vector{Vector{Float64}}=Vector{Vector{Float64}}(),
     hist_cache::HistCache=HistCache(1 << depth, qf.n_bins, cat_sorted_vals),
@@ -76,7 +76,9 @@ function build_symmetric_tree(
         if isempty(group)
             leaf_values[l] = 0.0
         elseif refine
-            leaf_values[l] = _leaf_value_refine(group, leaf_refine_values, leaf_refine_weights)
+            leaf_values[l] = _leaf_value_refine(
+                group, leaf_refine_values, leaf_refine_weights
+            )
         else
             leaf_values[l] = _leaf_value_newton(group, gradients, hessians, l2_leaf_reg)
         end
@@ -102,11 +104,11 @@ end
 @inline function _leaf_value_refine(group, leaf_refine_values, leaf_refine_weights)
     n_leaf = length(group)
     local_vals = Vector{Float64}(undef, n_leaf)
-    local_ws   = Vector{Float64}(undef, n_leaf)
+    local_ws = Vector{Float64}(undef, n_leaf)
     @inbounds for j in 1:n_leaf
         idx = group[j]
         local_vals[j] = leaf_refine_values[idx]
-        local_ws[j]   = leaf_refine_weights === nothing ? 1.0 : leaf_refine_weights[idx]
+        local_ws[j] = leaf_refine_weights === nothing ? 1.0 : leaf_refine_weights[idx]
     end
     return weighted_median(local_vals, local_ws)
 end

@@ -28,9 +28,9 @@ end
 
 @testset "Pool with feature_names and weight" begin
     X = [1.0 2.0; 3.0 4.0; 5.0 6.0]
-    pool = Pool(X; label=[1.0, 2.0, 3.0],
-                feature_names=[:alpha, :beta],
-                weight=[1.0, 2.0, 1.0])
+    pool = Pool(
+        X; label=[1.0, 2.0, 3.0], feature_names=[:alpha, :beta], weight=[1.0, 2.0, 1.0]
+    )
     @test pool.feature_names == [:alpha, :beta]
     @test pool.weight == [1.0, 2.0, 1.0]
 end
@@ -45,15 +45,15 @@ end
     w = [10.0, 10.0, 1.0, 1.0, 10.0, 1.0]  # heavily upweight class-0 samples
 
     pool_unweighted = Pool(X; label=y)
-    pool_weighted   = Pool(X; label=y, weight=w)
+    pool_weighted = Pool(X; label=y, weight=w)
 
     model_uw = MichiBoostClassifier(; iterations=20, depth=3, random_seed=1, verbose=false)
-    model_w  = MichiBoostClassifier(; iterations=20, depth=3, random_seed=1, verbose=false)
+    model_w = MichiBoostClassifier(; iterations=20, depth=3, random_seed=1, verbose=false)
     MichiBoost.fit!(model_uw, pool_unweighted)
-    MichiBoost.fit!(model_w,  pool_weighted)
+    MichiBoost.fit!(model_w, pool_weighted)
 
     preds_uw = MichiBoost.predict(model_uw, X; prediction_type="Probability")
-    preds_w  = MichiBoost.predict(model_w,  X; prediction_type="Probability")
+    preds_w = MichiBoost.predict(model_w, X; prediction_type="Probability")
     @test preds_uw != preds_w
 end
 
@@ -68,7 +68,7 @@ end
 @testset "fit! with unlabeled Pool preserves categorical columns" begin
     using DataFrames
     using MichiBoost: MichiBoostClassifier
-    df = DataFrame(
+    df = DataFrame(;
         cat1=["a", "b", "a", "b", "c", "c", "a", "b"],
         num1=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
     )

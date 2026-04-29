@@ -77,7 +77,7 @@ end
 # these; keeping the element type concrete avoids dynamic dispatch on every
 # `group[k]` / `length(group)` in the hot loops — a `Vector{Any}` here cost
 # ~800k boxed-Int allocations per boosting round.
-const LeafGroupView = SubArray{Int64, 1, Vector{Int64}, Tuple{UnitRange{Int64}}, true}
+const LeafGroupView = SubArray{Int64,1,Vector{Int64},Tuple{UnitRange{Int64}},true}
 
 struct SplitCandidate
     feature_index::Int
@@ -169,9 +169,15 @@ function HistCache(
     num_hist_g = [zeros(Float64, max_leaves, num_n_bins[j] + 1) for j in 1:n_num]
     num_hist_h = [zeros(Float64, max_leaves, num_n_bins[j] + 1) for j in 1:n_num]
     num_hist_c = [zeros(Int, max_leaves, num_n_bins[j] + 1) for j in 1:n_num]
-    cat_hist_g = [zeros(Float64, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat]
-    cat_hist_h = [zeros(Float64, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat]
-    cat_hist_c = [zeros(Int, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat]
+    cat_hist_g = [
+        zeros(Float64, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat
+    ]
+    cat_hist_h = [
+        zeros(Float64, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat
+    ]
+    cat_hist_c = [
+        zeros(Int, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat
+    ]
     return HistCache(
         num_hist_g,
         num_hist_h,
@@ -278,12 +284,16 @@ function HistCacheMC(
     num_hist_h = [zeros(Float64, n_classes, max_leaves, num_n_bins[j] + 1) for j in 1:n_num]
     num_hist_c = [zeros(Int, max_leaves, num_n_bins[j] + 1) for j in 1:n_num]
     cat_hist_g = [
-        zeros(Float64, n_classes, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat
+        zeros(Float64, n_classes, max_leaves, max(length(cat_sorted_vals[j]), 1)) for
+        j in 1:n_cat
     ]
     cat_hist_h = [
-        zeros(Float64, n_classes, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat
+        zeros(Float64, n_classes, max_leaves, max(length(cat_sorted_vals[j]), 1)) for
+        j in 1:n_cat
     ]
-    cat_hist_c = [zeros(Int, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat]
+    cat_hist_c = [
+        zeros(Int, max_leaves, max(length(cat_sorted_vals[j]), 1)) for j in 1:n_cat
+    ]
     return HistCacheMC(
         num_hist_g,
         num_hist_h,

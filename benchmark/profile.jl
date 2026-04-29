@@ -31,20 +31,41 @@ end
 n_total = round(Int, N / 0.8)
 
 X, y, loss, make_model = if TASK == "regression"
-    X, y = regression_data(n=n_total, p=54)
-    X, y, "RMSE",
-    () -> MichiBoostRegressor(; iterations=ITERS_PROFILE, learning_rate=LR, depth=DEPTH,
-                              loss_function="RMSE", random_seed=SEED, verbose=false)
+    X, y = regression_data(; n=n_total, p=54)
+    X,
+    y, "RMSE",
+    () -> MichiBoostRegressor(;
+        iterations=ITERS_PROFILE,
+        learning_rate=LR,
+        depth=DEPTH,
+        loss_function="RMSE",
+        random_seed=SEED,
+        verbose=false,
+    )
 elseif TASK == "binary"
-    X, y = binary_data(n=n_total, p=54)
-    X, y, "Logloss",
-    () -> MichiBoostClassifier(; iterations=ITERS_PROFILE, learning_rate=LR, depth=DEPTH,
-                               loss_function="Logloss", random_seed=SEED, verbose=false)
+    X, y = binary_data(; n=n_total, p=54)
+    X,
+    y, "Logloss",
+    () -> MichiBoostClassifier(;
+        iterations=ITERS_PROFILE,
+        learning_rate=LR,
+        depth=DEPTH,
+        loss_function="Logloss",
+        random_seed=SEED,
+        verbose=false,
+    )
 else
-    X, y = multiclass_data(n=n_total, p=54, k=7)
-    X, y, "MultiClass",
-    () -> MichiBoostClassifier(; iterations=ITERS_PROFILE, learning_rate=LR, depth=DEPTH,
-                               loss_function="MultiClass", random_seed=SEED, verbose=false)
+    X, y = multiclass_data(; n=n_total, p=54, k=7)
+    X,
+    y, "MultiClass",
+    () -> MichiBoostClassifier(;
+        iterations=ITERS_PROFILE,
+        learning_rate=LR,
+        depth=DEPTH,
+        loss_function="MultiClass",
+        random_seed=SEED,
+        verbose=false,
+    )
 end
 
 X_tr, y_tr, _, _ = train_test_split(X, y)
@@ -64,9 +85,13 @@ println("="^72)
 GC.gc()
 stats = @timed MichiBoost.fit!(make_model(), pool_tr)
 @printf "  wall       %8.3f s\n" stats.time
-@printf "  allocated  %8.1f MB   (%d allocations)\n" (stats.bytes/1024^2) stats.gcstats.poolalloc
-@printf "  gc         %8.1f %% of wall  (%.3f s)\n" (100*stats.gctime/max(stats.time, 1e-9)) stats.gctime
-@printf "  per iter   %8.1f ms/iter  %8.1f MB/iter  %d allocs/iter\n" (1000*stats.time/ITERS_PROFILE) (stats.bytes/1024^2/ITERS_PROFILE) (stats.gcstats.poolalloc ÷ ITERS_PROFILE)
+@printf "  allocated  %8.1f MB   (%d allocations)\n" (stats.bytes / 1024^2) stats.gcstats.poolalloc
+@printf "  gc         %8.1f %% of wall  (%.3f s)\n" (
+    100 * stats.gctime / max(stats.time, 1e-9)
+) stats.gctime
+@printf "  per iter   %8.1f ms/iter  %8.1f MB/iter  %d allocs/iter\n" (
+    1000 * stats.time / ITERS_PROFILE
+) (stats.bytes / 1024^2 / ITERS_PROFILE) (stats.gcstats.poolalloc ÷ ITERS_PROFILE)
 
 println("\n", "="^72)
 println("CPU PROFILE (all threads, top self-time)")
@@ -77,7 +102,10 @@ Profile.@profile MichiBoost.fit!(make_model(), pool_tr)
 
 Profile.print(
     IOContext(stdout, :displaysize => (50, 200));
-    format=:flat, sortedby=:count, mincount=30, noisefloor=2.0,
+    format=:flat,
+    sortedby=:count,
+    mincount=30,
+    noisefloor=2.0,
 )
 
 println("\n", "="^72)
@@ -85,7 +113,11 @@ println("CPU PROFILE (main thread only — serial regions)")
 println("="^72)
 Profile.print(
     IOContext(stdout, :displaysize => (40, 200));
-    format=:flat, sortedby=:count, threads=[1], mincount=10, noisefloor=2.0,
+    format=:flat,
+    sortedby=:count,
+    threads=[1],
+    mincount=10,
+    noisefloor=2.0,
 )
 
 flat_path = joinpath(@__DIR__, "profile_flat.txt")
@@ -106,7 +138,7 @@ else
     println("ALLOCATION PROFILE (sample_rate=0.001, extrapolate ×1000)")
     println("="^72)
     Profile.Allocs.clear()
-    Profile.Allocs.@profile sample_rate=0.001 MichiBoost.fit!(make_model(), pool_tr)
+    Profile.Allocs.@profile sample_rate = 0.001 MichiBoost.fit!(make_model(), pool_tr)
     results = Profile.Allocs.fetch()
 
     by_type = Dict{String,Tuple{Int,Int}}()
@@ -115,12 +147,12 @@ else
         c, b = get(by_type, t, (0, 0))
         by_type[t] = (c + 1, b + a.size)
     end
-    sorted = sort(collect(by_type); by = x -> -x[2][2])
+    sorted = sort(collect(by_type); by=x -> -x[2][2])
 
     @printf "  %10s  %12s  %s\n" "sampled MB" "sampled #" "type"
     @printf "  %s\n" repeat('-', 90)
     for (t, (c, b)) in first(sorted, 20)
-        @printf "  %10.2f  %12d  %s\n" (b/1024^2) c t
+        @printf "  %10.2f  %12d  %s\n" (b / 1024^2) c t
     end
     @printf "\n  (multiply by ~1000 to estimate totals at full sample rate)\n"
 
@@ -143,7 +175,7 @@ else
             key = user_frame(a.stacktrace)
             by_site[key] = get(by_site, key, 0) + 1
         end
-        top = sort(collect(by_site); by = x -> -x[2])
+        top = sort(collect(by_site); by=x -> -x[2])
         for (site, c) in first(top, 8)
             @printf "    %8d  %s\n" c site
         end
