@@ -301,6 +301,56 @@ function feature_importance(m::MichiBoostWrapper)
 end
 
 """
+    score(model, data, y; cat_features=nothing) -> Float64
+
+Compute a default score for the trained model on `(data, y)`:
+
+- **Regressor**: coefficient of determination (R²).
+- **Classifier**: accuracy (fraction of predictions matching `y`).
+
+`data` can be a `Pool`, a matrix, or any Tables.jl-compatible source. `y` must
+be supplied in the same form used during training (numeric for regression,
+original class labels for classification).
+
+# Example
+```julia
+acc = score(clf, X_test, y_test)
+r2  = score(reg, X_test, y_test)
+```
+"""
+function score(m::MichiBoostWrapper, data, y; cat_features=nothing)
+    m.model === nothing && error("Model has not been trained. Call fit! first.")
+    pool = data isa Pool ? data : Pool(data; cat_features)
+    length(y) == pool.n_samples ||
+        throw(DimensionMismatch("`y` has $(length(y)) entries but `data` has $(pool.n_samples) rows"))
+    ŷ = predict(m, pool)
+    return _score(m, y, ŷ)
+end
+
+function _score(::MichiBoostRegressor, y, ŷ)
+    yf = Float64.(y)
+    ȳ = sum(yf) / length(yf)
+    ss_res = 0.0
+    ss_tot = 0.0
+    @inbounds for i in eachindex(yf)
+        d_res = yf[i] - ŷ[i]
+        d_tot = yf[i] - ȳ
+        ss_res += d_res * d_res
+        ss_tot += d_tot * d_tot
+    end
+    return ss_tot == 0.0 ? (ss_res == 0.0 ? 1.0 : 0.0) : 1.0 - ss_res / ss_tot
+end
+
+function _score(::MichiBoostClassifier, y, ŷ)
+    n = length(y)
+    correct = 0
+    @inbounds for i in 1:n
+        correct += ŷ[i] == y[i]
+    end
+    return correct / n
+end
+
+"""
     shap_values(model, data; cat_features=nothing) -> Array
 
 Compute SHAP feature attributions for each sample.

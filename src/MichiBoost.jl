@@ -45,6 +45,7 @@ export feature_importance
 export fit!
 export load_model, save_model
 export predict, predict_classes, predict_proba
+export score
 export shap_values
 export slice
 
