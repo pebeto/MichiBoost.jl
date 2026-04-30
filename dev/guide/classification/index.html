@@ -5,7 +5,7 @@ model = MichiBoostClassifier(;
     iterations=200,
     learning_rate=0.03,
     depth=6,
-    loss_function=&quot;Logloss&quot;
+    loss_function=Losses.Logloss,
 )
 
 fit!(model, X_train, y_train)</code></pre><h3 id="Prediction-Types"><a class="docs-heading-anchor" href="#Prediction-Types">Prediction Types</a><a id="Prediction-Types-1"></a><a class="docs-heading-anchor-permalink" href="#Prediction-Types" title="Permalink"></a></h3><pre><code class="language-julia hljs"># Get probability of positive class
@@ -15,7 +15,9 @@ probabilities = predict_proba(model, X_test)
 classes = predict(model, X_test)
 
 # Get raw logits (before sigmoid)
-logits = predict(model, X_test; prediction_type=&quot;RawFormulaVal&quot;)</code></pre><p><code>predict(clf, X)</code> returns class labels by default. Pass <code>prediction_type=&quot;Probability&quot;</code> to get probabilities, or <code>prediction_type=&quot;RawFormulaVal&quot;</code> for the pre-transform scores.</p><h2 id="Multi-Class-Classification"><a class="docs-heading-anchor" href="#Multi-Class-Classification">Multi-Class Classification</a><a id="Multi-Class-Classification-1"></a><a class="docs-heading-anchor-permalink" href="#Multi-Class-Classification" title="Permalink"></a></h2><p>Multi-class classification is automatically detected when your target has more than 2 unique values:</p><pre><code class="language-julia hljs">using MichiBoost
+logits = predict(model, X_test; prediction_type=PredictionTypes.RawFormulaVal)
+# or, CatBoost-style:
+logits = predict(model, X_test; prediction_type=&quot;RawFormulaVal&quot;)</code></pre><p><code>predict(clf, X)</code> returns class labels by default. Pass <code>prediction_type=PredictionTypes.Probability</code> to get probabilities, or <code>prediction_type=PredictionTypes.RawFormulaVal</code> for the pre-transform scores. Strings (<code>&quot;Probability&quot;</code>, <code>&quot;RawFormulaVal&quot;</code>) are also accepted.</p><h2 id="Multi-Class-Classification"><a class="docs-heading-anchor" href="#Multi-Class-Classification">Multi-Class Classification</a><a id="Multi-Class-Classification-1"></a><a class="docs-heading-anchor-permalink" href="#Multi-Class-Classification" title="Permalink"></a></h2><p>Multi-class classification is automatically detected when your target has more than 2 unique values:</p><pre><code class="language-julia hljs">using MichiBoost
 
 # Target with 3 classes
 y = [0, 1, 2, 0, 1, 2, 0, 1, 2]
@@ -77,7 +79,7 @@ model = MichiBoostClassifier(;
     iterations=200,
     learning_rate=0.05,
     depth=4,
-    loss_function=&quot;MultiClass&quot;
+    loss_function=Losses.MultiClass,
 )
 
 fit!(model, X_train, y_train)
@@ -97,4 +99,4 @@ fit!(model, X, y)
 
 # Predictions return original string labels
 predictions = predict(model, X)
-# [&quot;cat&quot;, &quot;dog&quot;, &quot;cat&quot;, &quot;bird&quot;, &quot;dog&quot;, &quot;bird&quot;]</code></pre><p>See the <a href="../advanced/">Advanced Features</a> guide for cross-validation, SHAP values, feature importance, sample weights, and model persistence.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../regression/">« Regression</a><a class="docs-footer-nextpage" href="../categorical_features/">Categorical Features »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 30 April 2026 20:04">Thursday 30 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+# [&quot;cat&quot;, &quot;dog&quot;, &quot;cat&quot;, &quot;bird&quot;, &quot;dog&quot;, &quot;bird&quot;]</code></pre><p>See the <a href="../advanced/">Advanced Features</a> guide for cross-validation, SHAP values, feature importance, sample weights, and model persistence.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../regression/">« Regression</a><a class="docs-footer-nextpage" href="../categorical_features/">Categorical Features »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 30 April 2026 22:58">Thursday 30 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
