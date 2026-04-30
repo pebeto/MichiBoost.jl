@@ -50,28 +50,35 @@ model = MichiBoostRegressor(; l2_leaf_reg=5.0)
 
 ## Loss Functions
 
+Pass a `Losses.*` tag type or a CatBoost-style string. Tag types catch typos at
+parse time (e.g., `Losses.RMES` is `UndefVarError`); strings are
+case-insensitive.
+
 ### Regression
 
 ```julia
 # Root Mean Squared Error (default)
+model = MichiBoostRegressor(; loss_function=Losses.RMSE)
+# or, CatBoost-style:
 model = MichiBoostRegressor(; loss_function="RMSE")
 
 # Mean Absolute Error
-model = MichiBoostRegressor(; loss_function="MAE")
+model = MichiBoostRegressor(; loss_function=Losses.MAE)
 ```
 
 ### Classification
 
 ```julia
 # Binary classification (default)
-model = MichiBoostClassifier(; loss_function="Logloss")
+model = MichiBoostClassifier(; loss_function=Losses.Logloss)
 
 # Multi-class (auto-detected if target has >2 classes)
-model = MichiBoostClassifier(; loss_function="MultiClass")
+model = MichiBoostClassifier(; loss_function=Losses.MultiClass)
 ```
 
-Accepted values are case-insensitive. `"CrossEntropy"` is an alias for
-`"Logloss"`, and `"MultiLogLoss"` is an alias for `"MultiClass"`.
+`Losses.CrossEntropy` is an alias for `Losses.Logloss`, and `Losses.MultiLogloss`
+for `Losses.MultiClass`. The same aliases work for the string form
+(`"CrossEntropy"`, `"MultiLogLoss"`).
 
 ## Feature Processing
 
@@ -101,20 +108,22 @@ model = MichiBoostRegressor(; min_data_in_leaf=5)
 
 ### `boosting_type`
 
-**Type:** `String`
-**Default:** `"Ordered"`
+**Type:** `Union{Type{<:BoostingTypes.BoostingType}, String}`
+**Default:** `BoostingTypes.Ordered`
 
 Controls how target statistics are computed for categorical features.
 
-- `"Ordered"` — uses a random permutation so each sample's encoding is derived
-  from preceding samples only, reducing target leakage.
-- `"Plain"` — encodes each category using statistics from the full training set.
+- `BoostingTypes.Ordered` (or `"Ordered"`) — uses a random permutation so each
+  sample's encoding is derived from preceding samples only, reducing target
+  leakage.
+- `BoostingTypes.Plain` (or `"Plain"`) — encodes each category using statistics
+  from the full training set.
 
 Gradient computation uses standard (plain) gradient boosting in both modes.
 
 ```julia
-model = MichiBoostRegressor(; boosting_type="Ordered")
-model = MichiBoostRegressor(; boosting_type="Plain")
+model = MichiBoostRegressor(; boosting_type=BoostingTypes.Ordered)
+model = MichiBoostRegressor(; boosting_type=BoostingTypes.Plain)
 ```
 
 ## Early Stopping
@@ -134,6 +143,39 @@ val_pool = Pool(X_val; label=y_val)
 model = MichiBoostRegressor(; iterations=1000, early_stopping_rounds=50)
 fit!(model, train_pool; eval_set=val_pool)
 ```
+
+### `eval_metric`
+
+**Type:** `Union{Type{<:Metric}, String, Nothing}`
+**Default:** `nothing`
+
+Metric used to drive the early-stopping comparison. `nothing` falls back to the
+training loss. Pass a tag from the `Metrics` submodule for compile-time-checked
+names (typos become `UndefVarError` at parse time); CatBoost-style strings are
+also accepted for parity with the Python API. Comparison direction is inferred
+per metric.
+
+| Task        | Tag types | String aliases |
+| ----------- | --------- | -------------- |
+| Regression  | `Metrics.RMSE`, `Metrics.MAE`, `Metrics.R2` | `"RMSE"`, `"MAE"`, `"R2"` |
+| Binary      | `Metrics.Logloss`, `Metrics.Accuracy`, `Metrics.F1`, `Metrics.AUC` | `"Logloss"`, `"Accuracy"`, `"F1"`, `"AUC"` |
+| Multi-class | `Metrics.MultiLogloss`, `Metrics.Accuracy` | `"MultiClass"`, `"Accuracy"` |
+
+```julia
+using MichiBoost
+
+clf = MichiBoostClassifier(;
+    iterations=1000,
+    early_stopping_rounds=20,
+    eval_metric=Metrics.AUC,        # bare type, no `()`
+)
+fit!(clf, train_pool; eval_set=val_pool)
+```
+
+Regression metrics are computed via
+[StatisticalMeasures.jl](https://github.com/JuliaAI/StatisticalMeasures.jl);
+classification metrics are inlined to avoid the per-iteration cost of building
+`UnivariateFinite` distributions.
 
 ## Other Parameters
 

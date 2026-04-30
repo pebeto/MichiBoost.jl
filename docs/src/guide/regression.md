@@ -11,7 +11,7 @@ model = MichiBoostRegressor(;
     iterations=1000,
     learning_rate=0.03,
     depth=6,
-    loss_function="RMSE"
+    loss_function=Losses.RMSE,
 )
 ```
 
@@ -22,7 +22,7 @@ model = MichiBoostRegressor(;
 The default loss function for regression. Minimizes the squared differences between predictions and targets.
 
 ```julia
-model = MichiBoostRegressor(; loss_function="RMSE")
+model = MichiBoostRegressor(; loss_function=Losses.RMSE)
 ```
 
 ### MAE (Mean Absolute Error)
@@ -30,7 +30,7 @@ model = MichiBoostRegressor(; loss_function="RMSE")
 Minimizes the absolute differences between predictions and targets.
 
 ```julia
-model = MichiBoostRegressor(; loss_function="MAE")
+model = MichiBoostRegressor(; loss_function=Losses.MAE)
 ```
 
 ## Complete Example

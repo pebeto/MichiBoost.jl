@@ -37,29 +37,3 @@ function predict_tree!(
     end
     return nothing
 end
-
-function predict_tree(tree::SymmetricTree, num_bins, cat_encoded)
-    n = size(num_bins, 1)
-    leaf_indices = zeros(Int, n)
-    @inbounds for k in 1:(tree.depth)
-        feat_idx = tree.split_feature_indices[k]
-        thr = tree.split_thresholds[k]
-        if tree.split_feature_types[k] == :numerical
-            thr_u = UInt16(thr)
-            for i in 1:n
-                leaf_indices[i] =
-                    (leaf_indices[i] << 1) | Int(num_bins[i, feat_idx] > thr_u)
-            end
-        else
-            for i in 1:n
-                leaf_indices[i] =
-                    (leaf_indices[i] << 1) | Int(cat_encoded[i, feat_idx] > thr)
-            end
-        end
-    end
-    out = Vector{Float64}(undef, n)
-    @inbounds for i in 1:n
-        out[i] = tree.leaf_values[leaf_indices[i] + 1]
-    end
-    return out
-end

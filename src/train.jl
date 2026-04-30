@@ -12,6 +12,7 @@ function train(
     rsm::Float64=1.0,
     early_stopping_rounds::Union{Int,Nothing}=nothing,
     eval_pool::Union{Pool,Nothing}=nothing,
+    eval_metric::Union{Type{<:Metric},Nothing}=nothing,
     boosting_type::String="Ordered",
     kwargs...,
 )
@@ -92,7 +93,15 @@ function train(
     end
 
     trees = is_multiclass ? SymmetricTreeMultiClass[] : SymmetricTree[]
-    best_eval_loss, rounds_no_improve, best_iter = Inf, 0, 0
+
+    es_orientation, es_metric_fn = if eval_metric === nothing
+        # Default: use the training loss for the eval signal (lower is better).
+        :minimize, (y, p) -> loss(lf, y, p)
+    else
+        _eval_metric(eval_metric, is_multiclass, n_classes)
+    end
+    best_eval_value = es_orientation == :minimize ? Inf : -Inf
+    rounds_no_improve, best_iter = 0, 0
     sample_indices = collect(1:n_samples)
 
     weights = pool.weight !== nothing ? pool.weight : ones(Float64, n_samples)
@@ -267,7 +276,7 @@ function train(
         if es_active
             # Extend the running eval predictions with the just-built tree
             # so we only pay O(1) tree-prediction per ES check.
-            if is_multiclass
+            eval_value = if is_multiclass
                 predict_tree!(
                     eval_preds_mat,
                     tree,
@@ -276,7 +285,7 @@ function train(
                     learning_rate,
                     eval_leaf_indices,
                 )
-                eval_loss = loss(lf, eval_y_onehot, eval_preds_mat)
+                es_metric_fn(eval_y_onehot, eval_preds_mat)
             else
                 predict_tree!(
                     eval_preds_vec,
@@ -286,10 +295,15 @@ function train(
                     learning_rate,
                     eval_leaf_indices,
                 )
-                eval_loss = loss(lf, eval_y_vec, eval_preds_vec)
+                es_metric_fn(eval_y_vec, eval_preds_vec)
             end
-            if eval_loss < best_eval_loss
-                best_eval_loss = eval_loss
+            improved = if es_orientation == :minimize
+                eval_value < best_eval_value
+            else
+                eval_value > best_eval_value
+            end
+            if improved
+                best_eval_value = eval_value
                 best_iter = iter
                 rounds_no_improve = 0
             else
@@ -309,7 +323,6 @@ function train(
         trees,
         learning_rate,
         is_multiclass ? initial_pred : initial_pred_val,
-        loss_function,
         encoder,
         qf.borders,
         pool.feature_names,

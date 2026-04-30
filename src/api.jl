@@ -8,16 +8,30 @@ Create a gradient-boosted regression model.
 - `learning_rate::Float64=0.03` — step-size shrinkage applied to each tree.
 - `depth::Int=6` — depth of each symmetric tree.
 - `l2_leaf_reg::Float64=3.0` — L2 regularisation on leaf values.
-- `loss_function::String="RMSE"` — `"RMSE"` or `"MAE"`.
+- `loss_function::Union{Type{<:Losses.LossKind},String}="RMSE"` — pass a
+  `Losses.*` tag type (e.g., `Losses.RMSE`) or a CatBoost-style string. For
+  regression: `Losses.RMSE` / `Losses.MAE`. For classification: `Losses.Logloss`,
+  `Losses.MultiClass` (auto-detected on classifier targets).
 - `border_count::Int=254` — max quantization borders per numerical feature.
 - `min_data_in_leaf::Int=1` — minimum samples required in a leaf.
 - `random_seed::Union{Int,Nothing}=nothing` — seed for reproducibility.
 - `verbose::Bool=false` — print training progress.
-- `boosting_type::String="Ordered"` — `"Ordered"` uses a random permutation when
-  computing categorical target statistics (reduces leakage); `"Plain"` encodes
-  on the full training set.  Gradient computation is plain in both modes.
+- `boosting_type::Union{Type{<:BoostingTypes.BoostingType},String}="Ordered"` —
+  `BoostingTypes.Ordered` (or `"Ordered"`) uses a random permutation when
+  computing categorical target statistics (reduces leakage);
+  `BoostingTypes.Plain` (or `"Plain"`) encodes on the full training set.
+  Gradient computation is plain in both modes.
 - `early_stopping_rounds::Union{Int,Nothing}=nothing` — stop after this many
   rounds without improvement on `eval_set`.
+- `eval_metric::Union{Type{<:Metric},String,Nothing}=nothing` — metric used to
+  drive the early-stopping comparison. When `nothing` (default), the training
+  loss is used. Pass a `Metrics.*` tag type for compile-time-checked names
+  (e.g., `eval_metric=Metrics.AUC`); CatBoost-style strings like `"AUC"` also
+  work. Supported tags — regression: [`Metrics.RMSE`](@ref), [`Metrics.MAE`](@ref),
+  [`Metrics.R2`](@ref); binary: [`Metrics.Logloss`](@ref),
+  [`Metrics.Accuracy`](@ref), [`Metrics.F1`](@ref), [`Metrics.AUC`](@ref);
+  multi-class: [`Metrics.MultiLogloss`](@ref), [`Metrics.Accuracy`](@ref).
+  Comparison direction is inferred per metric.
 
 # Example
 ```julia
@@ -41,16 +55,19 @@ more than two unique values.
 
 Accepts the same keyword arguments as [`MichiBoostRegressor`](@ref), plus:
 
-- `loss_function::String="Logloss"` — `"Logloss"` for binary, `"MultiClass"`
-  for multi-class (auto-detected if omitted).
+- `loss_function::Union{Type{<:Losses.LossKind},String}="Logloss"` —
+  `Losses.Logloss` (or `"Logloss"`) for binary, `Losses.MultiClass` (or
+  `"MultiClass"`) for multi-class. Multi-class is auto-detected if omitted.
 - `class_weights::Union{AbstractDict,Nothing}=nothing` — per-class weights as a
   `Dict(label => weight)`; multiplies into the per-sample weights at fit time.
   Useful for imbalanced classification when adjusting per-row weights via
   [`Pool`](@ref) is inconvenient.
-- `auto_class_weights::Union{String,Nothing}=nothing` — automatic class weighting
-  derived from training-label frequencies. `"Balanced"` sets each weight to
-  `n / (n_classes * count[c])`; `"SqrtBalanced"` sets it to `sqrt(n / count[c])`.
-  Mutually exclusive with `class_weights`.
+- `auto_class_weights::Union{Type{<:AutoClassWeights.AutoClassWeightMode},String,Nothing}=nothing` —
+  automatic class weighting derived from training-label frequencies.
+  `AutoClassWeights.Balanced` (or `"Balanced"`) sets each weight to
+  `n / (n_classes * count[c])`; `AutoClassWeights.SqrtBalanced` (or
+  `"SqrtBalanced"`) sets it to `sqrt(n / count[c])`. Mutually exclusive with
+  `class_weights`.
 
 # Example
 ```julia
@@ -100,9 +117,7 @@ function fit!(m::MichiBoostWrapper, data, labels; cat_features=nothing, kwargs..
         pool = Pool(
             data.features_numerical,
             data.features_categorical,
-            data.cat_mapping,
             Float64.(labels),
-            data.label_mapping,
             data.label_classes,
             data.feature_names,
             data.numerical_feature_indices,
@@ -110,7 +125,6 @@ function fit!(m::MichiBoostWrapper, data, labels; cat_features=nothing, kwargs..
             data.n_samples,
             data.n_features,
             data.weight,
-            data.group_id,
         )
     end
     return fit!(m, pool; kwargs...)
@@ -130,7 +144,12 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
             acw === nothing ||
             error("`class_weights` and `auto_class_weights` are mutually exclusive")
         if acw !== nothing
-            cw = _auto_class_weights(pool, String(acw))
+            cw = _auto_class_weights(
+                pool,
+                _to_string(
+                    acw, AutoClassWeightMode, _auto_class_weight_name, "auto_class_weights"
+                ),
+            )
         end
         pool = _apply_class_weights(pool, cw)
     end
@@ -141,7 +160,9 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
         learning_rate=Float64(get(p, :learning_rate, 0.03)),
         depth=Int(get(p, :depth, 6)),
         l2_leaf_reg=Float64(get(p, :l2_leaf_reg, 3.0)),
-        loss_function=String(get(p, :loss_function, default_loss)),
+        loss_function=_to_string(
+            get(p, :loss_function, default_loss), LossKind, _loss_name, "loss_function"
+        ),
         border_count=Int(get(p, :border_count, 254)),
         min_data_in_leaf=Int(get(p, :min_data_in_leaf, 1)),
         random_seed=let v = get(p, :random_seed, nothing)
@@ -153,9 +174,31 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
             v === nothing ? nothing : Int(v)
         end,
         eval_pool=eval_set isa Pool ? eval_set : nothing,
-        boosting_type=String(get(p, :boosting_type, "Ordered")),
+        eval_metric=let v = get(p, :eval_metric, nothing)
+            if v === nothing
+                nothing
+            elseif v isa Type && v <: Metric
+                v
+            elseif v isa AbstractString
+                _resolve_metric(v)
+            else
+                error("`eval_metric` must be a `Metrics.*` type, a String, or `nothing`")
+            end
+        end,
+        boosting_type=_to_string(
+            get(p, :boosting_type, "Ordered"), BoostingType, _boosting_name, "boosting_type"
+        ),
     )
     return m
+end
+
+# Resolve a tag-or-string kwarg to its canonical String representation.
+# `tag_super` is the abstract tag base type (e.g., LossKind);
+# `name_fn` maps each concrete subtype to its canonical name.
+function _to_string(v, tag_super::Type, name_fn::Function, kwarg::AbstractString)
+    v isa AbstractString && return String(v)
+    v isa Type && v <: tag_super && return name_fn(v)
+    return error("`$kwarg` must be a tag type or a String, got `$(typeof(v))`")
 end
 
 # Return a new Pool whose `weight` has been multiplied by the per-class weight
@@ -190,9 +233,7 @@ function _apply_class_weights(pool::Pool, class_weights::AbstractDict)
     return Pool(
         pool.features_numerical,
         pool.features_categorical,
-        pool.cat_mapping,
         pool.label,
-        pool.label_mapping,
         pool.label_classes,
         pool.feature_names,
         pool.numerical_feature_indices,
@@ -200,7 +241,6 @@ function _apply_class_weights(pool::Pool, class_weights::AbstractDict)
         pool.n_samples,
         pool.n_features,
         new_weights,
-        pool.group_id,
     )
 end
 
@@ -257,11 +297,14 @@ Generate predictions from a trained model.
 - `model` — a trained [`MichiBoostRegressor`](@ref) or
   [`MichiBoostClassifier`](@ref).
 - `data` — a table, matrix, or [`Pool`](@ref).
-- `prediction_type` — one of:
-  - `"Class"` (default) — regression values, or predicted class labels for
-    classifiers.
-  - `"Probability"` — predicted probabilities (classification only).
-  - `"RawFormulaVal"` — raw logits / scores before any transformation.
+- `prediction_type` — a `PredictionTypes` tag type (e.g.,
+  `PredictionTypes.Probability`) or its CatBoost-style string name:
+  - `PredictionTypes.Class` / `"Class"` (default) — regression values, or
+    predicted class labels for classifiers.
+  - `PredictionTypes.Probability` / `"Probability"` — predicted probabilities
+    (classification only).
+  - `PredictionTypes.RawFormulaVal` / `"RawFormulaVal"` — raw logits / scores
+    before any transformation.
 - `cat_features` — categorical column indices or names (only needed when `data`
   is not a [`Pool`](@ref)).
 
@@ -277,13 +320,14 @@ Generate predictions from a trained model.
 ```
 """
 function predict(
-    m::MichiBoostWrapper, data; prediction_type::String="Class", cat_features=nothing
+    m::MichiBoostWrapper, data; prediction_type=PredictionTypes.Class, cat_features=nothing
 )
     m.model === nothing && error("Model has not been trained. Call fit! first.")
     pool = data isa Pool ? data : Pool(data; cat_features)
 
-    prediction_type == "RawFormulaVal" && return _predict_raw(m.model, pool)
-    prediction_type == "Probability" && return MichiBoost.predict(m.model, pool)
+    pt = _to_string(prediction_type, PredictionType, _prediction_name, "prediction_type")
+    pt == "RawFormulaVal" && return _predict_raw(m.model, pool)
+    pt == "Probability" && return MichiBoost.predict(m.model, pool)
     return if m isa MichiBoostClassifier
         predict_classes(m.model, pool)
     else
@@ -626,7 +670,15 @@ function cv(
     else
         _kfold_folds(n, fold_count, shuffle, rng)
     end
-    loss_fn = get(all_params, :loss_function, "RMSE")
+    loss_fn = _to_string(
+        get(all_params, :loss_function, "RMSE"), LossKind, _loss_name, "loss_function"
+    )
+    boosting = _to_string(
+        get(all_params, :boosting_type, "Ordered"),
+        BoostingType,
+        _boosting_name,
+        "boosting_type",
+    )
 
     train_losses, test_losses = Float64[], Float64[]
 
@@ -643,16 +695,16 @@ function cv(
             learning_rate=Float64(get(all_params, :learning_rate, 0.03)),
             depth=Int(get(all_params, :depth, 6)),
             l2_leaf_reg=Float64(get(all_params, :l2_leaf_reg, 3.0)),
-            loss_function=String(loss_fn),
+            loss_function=loss_fn,
             border_count=Int(get(all_params, :border_count, 254)),
             min_data_in_leaf=Int(get(all_params, :min_data_in_leaf, 1)),
             rsm=Float64(get(all_params, :rsm, 1.0)),
-            boosting_type=String(get(all_params, :boosting_type, "Ordered")),
+            boosting_type=boosting,
             verbose=Bool(verbose),
             random_seed=random_seed,
         )
 
-        lf = make_loss(String(loss_fn))
+        lf = make_loss(loss_fn)
 
         if model.is_multiclass
             train_logits = _predict_raw(model, train_pool)

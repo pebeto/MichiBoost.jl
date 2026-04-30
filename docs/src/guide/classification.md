@@ -13,7 +13,7 @@ model = MichiBoostClassifier(;
     iterations=200,
     learning_rate=0.03,
     depth=6,
-    loss_function="Logloss"
+    loss_function=Losses.Logloss,
 )
 
 fit!(model, X_train, y_train)
@@ -29,12 +29,15 @@ probabilities = predict_proba(model, X_test)
 classes = predict(model, X_test)
 
 # Get raw logits (before sigmoid)
+logits = predict(model, X_test; prediction_type=PredictionTypes.RawFormulaVal)
+# or, CatBoost-style:
 logits = predict(model, X_test; prediction_type="RawFormulaVal")
 ```
 
 `predict(clf, X)` returns class labels by default. Pass
-`prediction_type="Probability"` to get probabilities, or
-`prediction_type="RawFormulaVal"` for the pre-transform scores.
+`prediction_type=PredictionTypes.Probability` to get probabilities, or
+`prediction_type=PredictionTypes.RawFormulaVal` for the pre-transform scores.
+Strings (`"Probability"`, `"RawFormulaVal"`) are also accepted.
 
 ## Multi-Class Classification
 
@@ -121,7 +124,7 @@ model = MichiBoostClassifier(;
     iterations=200,
     learning_rate=0.05,
     depth=4,
-    loss_function="MultiClass"
+    loss_function=Losses.MultiClass,
 )
 
 fit!(model, X_train, y_train)

@@ -32,9 +32,7 @@ Construct via the `Pool` constructor with keyword arguments for `label`,
 mutable struct Pool
     features_numerical::Matrix{Float64}
     features_categorical::Vector{Vector{UInt32}}
-    cat_mapping::Vector{Dict{Any,UInt32}}
     label::Union{Vector{Float64},Nothing}
-    label_mapping::Union{Dict{Any,Float64},Nothing}
     label_classes::Union{Vector,Nothing}
     feature_names::Vector{Symbol}
     numerical_feature_indices::Vector{Int}
@@ -42,7 +40,6 @@ mutable struct Pool
     n_samples::Int
     n_features::Int
     weight::Union{Vector{Float64},Nothing}
-    group_id::Union{Vector{Any},Nothing}
 end
 
 struct QuantizedFeatures
@@ -341,7 +338,6 @@ mutable struct MichiBoostModel
     trees::Union{Vector{SymmetricTree},Vector{SymmetricTreeMultiClass}}
     learning_rate::Float64
     initial_pred::Union{Float64,Vector{Float64}}
-    loss_name::String
     encoder::Union{OrderedTargetEncoder,Nothing}
     borders::Vector{Vector{Float64}}
     feature_names::Vector{Symbol}

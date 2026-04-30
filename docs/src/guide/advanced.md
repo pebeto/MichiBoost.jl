@@ -51,12 +51,14 @@ weights are multiplied on top of it.
 For automatic weighting from label frequency, pass `auto_class_weights` instead:
 
 ```julia
+clf = MichiBoostClassifier(; iterations=200, auto_class_weights=AutoClassWeights.Balanced)
+# or, CatBoost-style:
 clf = MichiBoostClassifier(; iterations=200, auto_class_weights="Balanced")
 ```
 
-- `"Balanced"` — `weight[c] = n / (n_classes * count[c])`.
-- `"SqrtBalanced"` — `weight[c] = sqrt(n / count[c])`. Less aggressive than
-  `"Balanced"`.
+- `AutoClassWeights.Balanced` — `weight[c] = n / (n_classes * count[c])`.
+- `AutoClassWeights.SqrtBalanced` — `weight[c] = sqrt(n / count[c])`. Less
+  aggressive than `Balanced`.
 
 `class_weights` and `auto_class_weights` are mutually exclusive.
 

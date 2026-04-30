@@ -3,6 +3,7 @@ module MichiBoost
 using CategoricalArrays: CategoricalValue, unwrap
 using Random: AbstractRNG, MersenneTwister, Random, randperm, shuffle!
 using Serialization: Serialization
+using StatisticalMeasures: StatisticalMeasures
 using Statistics: mean, median
 using Tables: Tables
 
@@ -16,6 +17,13 @@ include("data/encoding.jl")
 
 # Loss functions
 include("losses.jl")
+
+# Eval-metric tag types and dispatcher
+include("metrics.jl")
+
+# String-replacement tag types for boosting_type / auto_class_weights /
+# prediction_type
+include("tags.jl")
 
 # Symmetric tree inference and construction
 include("trees/base/histograms.jl")
@@ -39,6 +47,7 @@ include("trees/shap.jl")
 include("api.jl")
 
 export MichiBoostClassifier, MichiBoostRegressor
+export AutoClassWeights, BoostingTypes, Losses, Metrics, PredictionTypes
 export Pool
 export cv
 export feature_importance

@@ -1,4 +1,6 @@
 using MichiBoost: MichiBoost, Pool, cv
+using MichiBoost.Losses
+using MichiBoost.BoostingTypes
 using Random
 using Test
 
@@ -161,4 +163,36 @@ end
         stratified=true,
         params=Dict("iterations" => 5, "loss_function" => "Logloss"),
     )
+end
+
+@testset "cv() accepts tag types in params dict" begin
+    Random.seed!(0)
+    X = randn(60, 3)
+    y = X[:, 1] .+ randn(60) .* 0.1
+    pool = Pool(X; label=y)
+
+    s_str = cv(
+        pool;
+        fold_count=2,
+        random_seed=1,
+        params=Dict(
+            :iterations => 10,
+            :depth => 2,
+            :loss_function => "MAE",
+            :boosting_type => "Plain",
+        ),
+    )
+    s_tag = cv(
+        pool;
+        fold_count=2,
+        random_seed=1,
+        params=Dict(
+            :iterations => 10,
+            :depth => 2,
+            :loss_function => Losses.MAE,
+            :boosting_type => BoostingTypes.Plain,
+        ),
+    )
+    @test s_str.train_loss == s_tag.train_loss
+    @test s_str.test_loss == s_tag.test_loss
 end

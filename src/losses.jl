@@ -39,13 +39,9 @@ function _softmax_matrix!(out::AbstractMatrix, logits::AbstractMatrix)
 end
 
 loss(::RMSELoss, y, pred) = sqrt(mean((y .- pred) .^ 2))
-negative_gradient(::RMSELoss, y, pred) = y .- pred
-hessian(::RMSELoss, y, pred) = ones(Float64, length(y))
 initial_prediction(::RMSELoss, y) = mean(y)
 
 loss(::MAELoss, y, pred) = mean(abs.(y .- pred))
-negative_gradient(::MAELoss, y, pred) = sign.(y .- pred)
-hessian(::MAELoss, y, pred) = ones(Float64, length(y))
 initial_prediction(::MAELoss, y) = median(y)
 
 # Weighted median over a sequence of values and non-negative weights.  Returns
@@ -73,15 +69,6 @@ function loss(::LoglossLoss, y, pred)
     return -mean(y .* log.(p) .+ (1.0 .- y) .* log.(1.0 .- p))
 end
 
-function negative_gradient(::LoglossLoss, y, pred)
-    return y .- _sigmoid.(pred)
-end
-
-function hessian(::LoglossLoss, y, pred)
-    p = _sigmoid.(pred)
-    return p .* (1.0 .- p)
-end
-
 function initial_prediction(::LoglossLoss, y)
     p = clamp(mean(y), 1e-7, 1.0 - 1e-7)
     return log(p / (1.0 - p))
@@ -90,15 +77,6 @@ end
 function loss(::MultiClassLoss, y_onehot::AbstractMatrix, pred::AbstractMatrix)
     probs = clamp.(_softmax_matrix(pred), 1e-15, 1.0)
     return -mean(sum(y_onehot .* log.(probs); dims=2))
-end
-
-function negative_gradient(::MultiClassLoss, y_onehot::AbstractMatrix, pred::AbstractMatrix)
-    return y_onehot .- _softmax_matrix(pred)
-end
-
-function hessian(::MultiClassLoss, ::AbstractMatrix, pred::AbstractMatrix)
-    probs = _softmax_matrix(pred)
-    return probs .* (1.0 .- probs)
 end
 
 function initial_prediction(::MultiClassLoss, y_onehot::AbstractMatrix)
@@ -173,3 +151,34 @@ function make_loss(name::AbstractString; n_classes::Int=2)
     upper in ("MULTICLASS", "MULTILOGLOSS") && return MultiClassLoss(n_classes)
     return error("Unknown loss function: $name. Supported: RMSE, MAE, Logloss, MultiClass")
 end
+
+"""
+    MichiBoost.Losses
+
+Singleton tag types for the `loss_function` keyword argument. Pass the bare
+type — for example `Losses.RMSE` — instead of the string `"RMSE"`. The
+CatBoost-style string form is still accepted at the wrapper boundary.
+"""
+module Losses
+
+abstract type LossKind end
+
+struct RMSE <: LossKind end
+struct MAE <: LossKind end
+struct Logloss <: LossKind end
+struct CrossEntropy <: LossKind end
+struct MultiClass <: LossKind end
+struct MultiLogloss <: LossKind end
+
+end  # module Losses
+
+using .Losses: LossKind
+
+# Canonical string name for each `Losses.*` tag, used to forward into the
+# existing string-keyed `make_loss` dispatcher without further refactoring.
+_loss_name(::Type{Losses.RMSE}) = "RMSE"
+_loss_name(::Type{Losses.MAE}) = "MAE"
+_loss_name(::Type{Losses.Logloss}) = "Logloss"
+_loss_name(::Type{Losses.CrossEntropy}) = "CrossEntropy"
+_loss_name(::Type{Losses.MultiClass}) = "MultiClass"
+_loss_name(::Type{Losses.MultiLogloss}) = "MultiLogloss"

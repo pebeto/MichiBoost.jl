@@ -15,6 +15,7 @@ end
     include("training/categorical.jl")
     include("training/training_options.jl")
     include("training/class_weights.jl")
+    include("training/eval_metric.jl")
 end
 
 @testset "API" verbose = true begin
@@ -24,6 +25,7 @@ end
     include("api/cv.jl")
     include("api/score.jl")
     include("api/shap.jl")
+    include("api/tag_types.jl")
 end
 
 Aqua.test_all(MichiBoost)

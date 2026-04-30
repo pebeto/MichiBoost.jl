@@ -12,11 +12,15 @@ predict_proba
 predict_classes
 ```
 
-The [`predict`](@ref) function accepts a `prediction_type` keyword argument:
+The [`predict`](@ref) function accepts a `prediction_type` keyword argument.
+Pass either a `PredictionTypes.*` tag or its CatBoost-style string:
 
-- `"Class"` (default) — regression values, or predicted class labels for classifiers.
-- `"Probability"` — predicted probabilities (classification only).
-- `"RawFormulaVal"` — raw logits / scores before any transformation.
+- `PredictionTypes.Class` / `"Class"` (default) — regression values, or
+  predicted class labels for classifiers.
+- `PredictionTypes.Probability` / `"Probability"` — predicted probabilities
+  (classification only).
+- `PredictionTypes.RawFormulaVal` / `"RawFormulaVal"` — raw logits / scores
+  before any transformation.
 
 ## Scoring
 

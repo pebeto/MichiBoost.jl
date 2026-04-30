@@ -69,6 +69,8 @@ Uses a random permutation so that each sample's encoding is computed from
 preceding samples only, reducing target leakage in the categorical statistics:
 
 ```julia
+model = MichiBoostRegressor(; boosting_type=BoostingTypes.Ordered)
+# or, CatBoost-style:
 model = MichiBoostRegressor(; boosting_type="Ordered")
 ```
 
@@ -77,7 +79,7 @@ model = MichiBoostRegressor(; boosting_type="Ordered")
 Computes target statistics on the entire training set:
 
 ```julia
-model = MichiBoostRegressor(; boosting_type="Plain")
+model = MichiBoostRegressor(; boosting_type=BoostingTypes.Plain)
 ```
 
 > **Note:** `boosting_type` only controls how categorical features are encoded.

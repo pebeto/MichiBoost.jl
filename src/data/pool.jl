@@ -1,6 +1,6 @@
 """
     Pool(data; label=nothing, cat_features=nothing, text_features=nothing,
-         feature_names=nothing, weight=nothing, group_id=nothing)
+         feature_names=nothing, weight=nothing)
 
 Create a `Pool` from tabular data.
 
@@ -16,7 +16,6 @@ Create a `Pool` from tabular data.
   (as categorical).
 - `feature_names`: optional vector of column names.
 - `weight`: optional per-sample weights (`Vector{<:Real}`).
-- `group_id`: optional group identifiers (for ranking-style tasks).
 
 # Examples
 ```julia
@@ -35,11 +34,8 @@ function Pool(
     text_features=nothing,
     feature_names=nothing,
     weight=nothing,
-    group_id=nothing,
 )
-    return _build_pool(
-        data; label, cat_features, text_features, feature_names, weight, group_id
-    )
+    return _build_pool(data; label, cat_features, text_features, feature_names, weight)
 end
 
 function Pool(;
@@ -49,11 +45,8 @@ function Pool(;
     text_features=nothing,
     feature_names=nothing,
     weight=nothing,
-    group_id=nothing,
 )
-    return _build_pool(
-        data; label, cat_features, text_features, feature_names, weight, group_id
-    )
+    return _build_pool(data; label, cat_features, text_features, feature_names, weight)
 end
 
 function _build_pool(
@@ -63,7 +56,6 @@ function _build_pool(
     text_features=nothing,
     feature_names=nothing,
     weight=nothing,
-    group_id=nothing,
 )
     if Tables.istable(data)
         ct = Tables.columntable(data)
@@ -104,7 +96,6 @@ function _build_pool(
     end
 
     features_categorical = Vector{Vector{UInt32}}(undef, length(cat_indices))
-    cat_mapping = Vector{Dict{Any,UInt32}}(undef, length(cat_indices))
     for (j, idx) in enumerate(cat_indices)
         col = columns[idx]
         mapping = Dict{Any,UInt32}()
@@ -119,13 +110,12 @@ function _build_pool(
             encoded[i] = mapping[v]
         end
         features_categorical[j] = encoded
-        cat_mapping[j] = mapping
     end
 
-    processed_label, label_mapping, label_classes = if label !== nothing
-        _process_label_full(label)
+    processed_label, label_classes = if label !== nothing
+        _process_label(label)
     else
-        (nothing, nothing, nothing)
+        (nothing, nothing)
     end
 
     processed_weight = if weight !== nothing
@@ -137,9 +127,7 @@ function _build_pool(
     return Pool(
         features_numerical,
         features_categorical,
-        cat_mapping,
         processed_label,
-        label_mapping,
         label_classes,
         fnames,
         num_indices,
@@ -147,7 +135,6 @@ function _build_pool(
         n_samples,
         n_total_features,
         processed_weight,
-        group_id,
     )
 end
 
@@ -174,14 +161,14 @@ _to_float(x) = parse(Float64, string(x))
 _unwrap_cat(x::CategoricalValue) = unwrap(x)
 _unwrap_cat(x) = x
 
-function _process_label_full(label)
+function _process_label(label)
     unwrapped = _unwrap_cat.(label)
     if all(x -> x isa Real, unwrapped)
-        return Float64.(unwrapped), nothing, nothing
+        return Float64.(unwrapped), nothing
     end
     unique_vals = sort(unique(unwrapped))
     label_map = Dict(v => Float64(i - 1) for (i, v) in enumerate(unique_vals))
-    return [label_map[v] for v in unwrapped], label_map, unique_vals
+    return [label_map[v] for v in unwrapped], unique_vals
 end
 
 n_numerical(pool::Pool) = size(pool.features_numerical, 2)
@@ -206,9 +193,7 @@ function slice(pool::Pool, indices::AbstractVector{<:Integer})
     return Pool(
         pool.features_numerical[indices, :],
         [col[indices] for col in pool.features_categorical],
-        pool.cat_mapping,
         pool.label !== nothing ? pool.label[indices] : nothing,
-        pool.label_mapping,
         pool.label_classes,
         pool.feature_names,
         pool.numerical_feature_indices,
@@ -216,6 +201,5 @@ function slice(pool::Pool, indices::AbstractVector{<:Integer})
         length(indices),
         pool.n_features,
         pool.weight !== nothing ? pool.weight[indices] : nothing,
-        pool.group_id !== nothing ? pool.group_id[indices] : nothing,
     )
 end
