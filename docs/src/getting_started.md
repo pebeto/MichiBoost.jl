@@ -30,10 +30,10 @@ julia -t 4   # or any thread count
 
 The typical workflow with MichiBoost.jl involves:
 
-1. **Create a model** — Choose `MichiBoostRegressor` or `MichiBoostClassifier`
-2. **Fit the model** — Train on your data using `fit!`
-3. **Make predictions** — Use `predict` (returns values or class labels) or
-   `predict_proba` (probabilities, classifiers only)
+1. **Create a model** — Choose [`MichiBoostRegressor`](@ref) or [`MichiBoostClassifier`](@ref)
+2. **Fit the model** — Train on your data using [`fit!`](@ref)
+3. **Make predictions** — Use [`predict`](@ref) (returns values or class labels) or
+   [`predict_proba`](@ref) (probabilities, classifiers only)
 
 ## Your First Model
 

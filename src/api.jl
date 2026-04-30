@@ -39,7 +39,7 @@ Create a gradient-boosted classification model.  Supports binary (Logloss) and
 multi-class (Softmax) targets.  Multi-class is auto-detected when the target has
 more than two unique values.
 
-Accepts the same keyword arguments as `MichiBoostRegressor`, plus:
+Accepts the same keyword arguments as [`MichiBoostRegressor`](@ref), plus:
 
 - `loss_function::String="Logloss"` — `"Logloss"` for binary, `"MultiClass"`
   for multi-class (auto-detected if omitted).
@@ -65,12 +65,12 @@ end
 Train `model` in-place on the given data.
 
 # Arguments
-- `model` — a `MichiBoostRegressor` or `MichiBoostClassifier`.
-- `data` — a table, matrix, or `Pool`.
-- `labels` — target vector (ignored when `data` is a `Pool` that already has a
-  label).
+- `model` — a [`MichiBoostRegressor`](@ref) or [`MichiBoostClassifier`](@ref).
+- `data` — a table, matrix, or [`Pool`](@ref).
+- `labels` — target vector (ignored when `data` is a [`Pool`](@ref) that already
+  has a label).
 - `cat_features` — categorical column indices (0-based) or names.
-- `eval_set` — optional validation `Pool` for early stopping.
+- `eval_set` — optional validation [`Pool`](@ref) for early stopping.
 - `kwargs...` — any hyperparameter accepted by the model constructor; overrides
   the values stored in `model.params` for this call only.
 
@@ -137,16 +137,16 @@ end
 Generate predictions from a trained model.
 
 # Arguments
-- `model` — a trained `MichiBoostRegressor` or
-  `MichiBoostClassifier`.
-- `data` — a table, matrix, or `Pool`.
+- `model` — a trained [`MichiBoostRegressor`](@ref) or
+  [`MichiBoostClassifier`](@ref).
+- `data` — a table, matrix, or [`Pool`](@ref).
 - `prediction_type` — one of:
   - `"Class"` (default) — regression values, or predicted class labels for
     classifiers.
   - `"Probability"` — predicted probabilities (classification only).
   - `"RawFormulaVal"` — raw logits / scores before any transformation.
 - `cat_features` — categorical column indices or names (only needed when `data`
-  is not a `Pool`).
+  is not a [`Pool`](@ref)).
 
 # Returns
 - **Regressor**: `Vector{Float64}` of predicted values.
@@ -308,7 +308,7 @@ Compute a default score for the trained model on `(data, y)`:
 - **Regressor**: coefficient of determination (R²).
 - **Classifier**: accuracy (fraction of predictions matching `y`).
 
-`data` can be a `Pool`, a matrix, or any Tables.jl-compatible source. `y` must
+`data` can be a [`Pool`](@ref), a matrix, or any Tables.jl-compatible source. `y` must
 be supplied in the same form used during training (numeric for regression,
 original class labels for classification).
 
@@ -382,10 +382,10 @@ end
 
 Serialize a trained model to disk using Julia's `Serialization` module.
 
-Works with both wrapper types (`MichiBoostRegressor`,
-`MichiBoostClassifier`) and raw `MichiBoostModel` objects.
+Works with both wrapper types ([`MichiBoostRegressor`](@ref),
+[`MichiBoostClassifier`](@ref)) and raw [`MichiBoostModel`](@ref) objects.
 
-See also `load_model`.
+See also [`load_model`](@ref).
 """
 function save_model(m::MichiBoostWrapper, filepath::AbstractString)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
@@ -395,7 +395,7 @@ end
 """
     load_model(filepath::AbstractString) -> MichiBoostModel
 
-Load a model previously saved with `save_model`.
+Load a model previously saved with [`save_model`](@ref).
 
 # Example
 ```julia
@@ -454,10 +454,10 @@ end
     cv(pool::Pool; params=Dict(), fold_count=3, shuffle=true, stratified=false,
        random_seed=0, verbose=false, kwargs...) -> NamedTuple
 
-Perform k-fold cross-validation on the given `Pool`.
+Perform k-fold cross-validation on the given [`Pool`](@ref).
 
 # Arguments
-- `pool` — a `Pool` with labels.
+- `pool` — a [`Pool`](@ref) with labels.
 - `params` — `Dict` of training hyperparameters (string or symbol keys).
 - `fold_count` — number of folds.
 - `shuffle` — whether to shuffle indices before splitting.

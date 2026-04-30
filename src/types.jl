@@ -331,11 +331,11 @@ end
 """
     MichiBoostModel
 
-The fitted model stored inside a `MichiBoostRegressor` /
-`MichiBoostClassifier` after `fit!`.  Contains the tree ensemble and
-everything needed for prediction.
+The fitted model stored inside a [`MichiBoostRegressor`](@ref) /
+[`MichiBoostClassifier`](@ref) after [`fit!`](@ref).  Contains the tree
+ensemble and everything needed for prediction.
 
-Not typically constructed directly — use `fit!` instead.
+Not typically constructed directly — use [`fit!`](@ref) instead.
 """
 mutable struct MichiBoostModel
     trees::Union{Vector{SymmetricTree},Vector{SymmetricTreeMultiClass}}
@@ -358,9 +358,9 @@ end
 A gradient-boosted regression model using symmetric (oblivious) decision trees.
 
 Create with `MichiBoostRegressor(; kwargs...)`, train with
-`fit!`, and generate predictions with `predict`.
+[`fit!`](@ref), and generate predictions with [`predict`](@ref).
 
-After training, the fitted `MichiBoostModel` is accessible via the
+After training, the fitted [`MichiBoostModel`](@ref) is accessible via the
 `.model` field.
 """
 mutable struct MichiBoostRegressor
@@ -375,10 +375,10 @@ A gradient-boosted classification model using symmetric (oblivious) decision
 trees.  Supports binary (Logloss) and multi-class (Softmax) targets.
 
 Create with `MichiBoostClassifier(; kwargs...)`, train with
-`fit!`, and generate predictions with `predict`,
-`predict_proba`, or `predict_classes`.
+[`fit!`](@ref), and generate predictions with [`predict`](@ref),
+[`predict_proba`](@ref), or [`predict_classes`](@ref).
 
-After training, the fitted `MichiBoostModel` is accessible via the
+After training, the fitted [`MichiBoostModel`](@ref) is accessible via the
 `.model` field.
 """
 mutable struct MichiBoostClassifier

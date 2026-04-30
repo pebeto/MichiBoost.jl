@@ -1,11 +1,15 @@
 # Advanced Features
 
-This guide covers features that are supported by both `MichiBoostRegressor` and
-`MichiBoostClassifier`.
+```@meta
+CurrentModule = MichiBoost
+```
+
+This guide covers features that are supported by both [`MichiBoostRegressor`](@ref) and
+[`MichiBoostClassifier`](@ref).
 
 ## Sample Weights
 
-Per-row importance weights are passed through `Pool`:
+Per-row importance weights are passed through [`Pool`](@ref):
 
 ```julia
 using MichiBoost
@@ -26,7 +30,7 @@ much.
 
 ## Cross-Validation
 
-`cv` runs k-fold cross-validation on a `Pool` and returns per-fold and mean
+[`cv`](@ref) runs k-fold cross-validation on a [`Pool`](@ref) and returns per-fold and mean
 losses:
 
 ```julia
@@ -85,7 +89,7 @@ For each row `i`, `sum(shap[i, :])` is approximately equal to
 
 ## Feature Importance
 
-`feature_importance` returns a `Vector{Pair{Symbol,Float64}}` mapping feature
+[`feature_importance`](@ref) returns a `Vector{Pair{Symbol,Float64}}` mapping feature
 names to percentages (summing to 100). The result is already sorted: features
 that split the most come first, followed by features that never appear in any
 split (score `0.0`). The score is split-count based, not gain-based.
@@ -115,6 +119,7 @@ loaded = load_model("model.jls")
 predictions = predict(loaded, Pool(X_test))
 ```
 
-`save_model` accepts either a wrapper (`MichiBoostRegressor` /
-`MichiBoostClassifier`) or a raw `MichiBoostModel`. `load_model` always returns
-a `MichiBoostModel`, which takes a `Pool` as prediction input.
+[`save_model`](@ref) accepts either a wrapper ([`MichiBoostRegressor`](@ref) /
+[`MichiBoostClassifier`](@ref)) or a raw [`MichiBoostModel`](@ref). [`load_model`](@ref)
+always returns a [`MichiBoostModel`](@ref), which takes a [`Pool`](@ref) as prediction
+input.

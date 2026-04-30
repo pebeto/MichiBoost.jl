@@ -4,7 +4,7 @@ MichiBoost.jl supports both binary and multi-class classification tasks.
 
 ## Binary Classification
 
-For binary classification, use `MichiBoostClassifier` with the Logloss loss function:
+For binary classification, use [`MichiBoostClassifier`](@ref) with the Logloss loss function:
 
 ```julia
 using MichiBoost

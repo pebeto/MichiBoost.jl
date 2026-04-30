@@ -125,7 +125,7 @@ model = MichiBoostRegressor(; boosting_type="Plain")
 **Default:** `nothing`
 
 Stop training if validation loss doesn't improve for this many rounds.
-Requires providing `eval_set` to `fit!`.
+Requires providing `eval_set` to [`fit!`](@ref).
 
 ```julia
 train_pool = Pool(X_train; label=y_train)
@@ -174,5 +174,5 @@ model = MichiBoostRegressor(; rsm=0.8)
 
 ## Sample Weights
 
-Per-row importance is passed through `Pool`, not through the model constructor.
+Per-row importance is passed through [`Pool`](@ref), not through the model constructor.
 See the [Advanced Features](advanced.md) guide.

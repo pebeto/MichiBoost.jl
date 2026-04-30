@@ -196,7 +196,7 @@ end
 """
     slice(pool::Pool, indices) -> Pool
 
-Return a new `Pool` containing only the rows at `indices`.
+Return a new [`Pool`](@ref) containing only the rows at `indices`.
 
 ```julia
 subset = slice(pool, 1:100)
