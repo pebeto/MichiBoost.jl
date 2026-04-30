@@ -35,7 +35,7 @@ function shap_values(model::MichiBoostModel, pool::Pool)
                     end
                 end
                 _shap_tree!(
-                    view(shap, i, :, :),
+                    view(shap,i,:,:),
                     tree,
                     leaf_idx,
                     lr,

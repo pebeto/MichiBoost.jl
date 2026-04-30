@@ -14,6 +14,7 @@ end
     include("training/classification.jl")
     include("training/categorical.jl")
     include("training/training_options.jl")
+    include("training/class_weights.jl")
 end
 
 @testset "API" verbose = true begin

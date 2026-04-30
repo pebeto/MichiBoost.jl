@@ -28,6 +28,26 @@ Weights scale the per-sample gradients and hessians during training. A weight of
 `0.0` effectively drops a row; a weight of `2.0` makes a row count twice as
 much.
 
+## Class Weights
+
+For classification, per-class weights can be supplied directly on
+[`MichiBoostClassifier`](@ref) without constructing a per-row vector. They are
+multiplied into the per-sample weights at fit time:
+
+```julia
+clf = MichiBoostClassifier(;
+    iterations=200,
+    class_weights=Dict(0.0 => 1.0, 1.0 => 5.0),  # upweight the positive class
+)
+fit!(clf, X, y)
+```
+
+The dict's keys must cover every distinct label; numeric keys match `Float64`
+labels by value (so `Dict(0 => 1.0)` works against `y = [0.0, 1.0, ...]`),
+non-numeric keys match the original labels passed to [`Pool`](@ref) /
+[`fit!`](@ref). If a [`Pool`](@ref) already has per-row `weight` set, class
+weights are multiplied on top of it.
+
 ## Cross-Validation
 
 [`cv`](@ref) runs k-fold cross-validation on a [`Pool`](@ref) and returns per-fold and mean

@@ -69,13 +69,15 @@ end
     Random.seed!(123)
     n = 150
     X = randn(n, 4)
-    y = Float64.([if (X[i, 1] > 0.5)
-        1.0
-    elseif (X[i, 2] > 0.5)
-        2.0
-    else
-        3.0
-    end for i in 1:n])
+    y = Float64.([
+        if (X[i, 1] > 0.5)
+            1.0
+        elseif (X[i, 2] > 0.5)
+            2.0
+        else
+            3.0
+        end for i in 1:n
+    ])
     pool = Pool(X; label=y)
 
     scores = cv(

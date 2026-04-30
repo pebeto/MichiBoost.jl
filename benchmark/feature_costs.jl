@@ -44,7 +44,7 @@ let
     t_cb =
         median(
             @benchmark(
-                CatBoost.cv($cb_pool, params=$cb_params, fold_count=5),
+                CatBoost.cv($cb_pool, params=($cb_params), fold_count=5),
                 samples = 3,
                 evals = 1
             )
@@ -55,7 +55,7 @@ let
     t_mb =
         median(
             @benchmark(
-                MichiBoost.cv($jl_pool, params=$jl_params, fold_count=5),
+                MichiBoost.cv($jl_pool, params=($jl_params), fold_count=5),
                 samples = 3,
                 evals = 1
             )
@@ -77,7 +77,7 @@ let
     t_cb =
         median(
             @benchmark(
-                CatBoost.cv($cb_pool, params=$cb_params, fold_count=5),
+                CatBoost.cv($cb_pool, params=($cb_params), fold_count=5),
                 samples = 3,
                 evals = 1
             )
@@ -88,7 +88,7 @@ let
     t_mb =
         median(
             @benchmark(
-                MichiBoost.cv($jl_pool, params=$jl_params, fold_count=5),
+                MichiBoost.cv($jl_pool, params=($jl_params), fold_count=5),
                 samples = 3,
                 evals = 1
             )
@@ -119,8 +119,8 @@ let
                 CatBoost.fit!(
                     $cb_fn(),
                     $cb_pool_tr,
-                    eval_set=$cb_pool_te,
-                    early_stopping_rounds=$ES_STOP,
+                    eval_set=($cb_pool_te),
+                    early_stopping_rounds=($ES_STOP),
                 ),
                 samples = 3,
                 evals = 1
@@ -144,8 +144,8 @@ let
                 MichiBoost.fit!(
                     $mb_fn(),
                     $jl_pool_tr,
-                    eval_pool=$jl_pool_te,
-                    early_stopping_rounds=$ES_STOP,
+                    eval_pool=($jl_pool_te),
+                    early_stopping_rounds=($ES_STOP),
                 ),
                 samples = 3,
                 evals = 1
@@ -165,15 +165,14 @@ let
     t_cb =
         median(
             @benchmark(
-                $cb.get_feature_importance(type="ShapValues", data=$cb_pool_te),
+                $cb.get_feature_importance(type="ShapValues", data=($cb_pool_te)),
                 samples = 3,
                 evals = 1
             )
         ).time / 1e6
     t_mb =
-        median(
-            @benchmark(MichiBoost.shap_values($mb, $X_reg_te), samples = 3, evals = 1)
-        ).time / 1e6
+        median(@benchmark(MichiBoost.shap_values($mb, $X_reg_te), samples = 3, evals = 1)).time /
+        1e6
 
     cmp_row("Regression (n_te=$(size(X_reg_te,1)))", t_mb, t_cb)
 end

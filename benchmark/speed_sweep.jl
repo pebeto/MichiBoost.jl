@@ -32,7 +32,7 @@ end
 function print_grid_row(n, p, t_cb, t_mb)
     su = t_cb / t_mb
     tag = su >= 1.0 ? "MB $(round(su; digits=2))x" : "CB $(round(1/su; digits=2))x"
-    println(
+    return println(
         "  n=$(lpad(n, 6))  p=$(lpad(p, 3))  CatBoost $(rpad(round(t_cb; digits=1), 8))ms  MichiBoost $(rpad(round(t_mb; digits=1), 8))ms  $tag",
     )
 end
@@ -43,52 +43,51 @@ function bench_fit(X_tr, y_tr, loss, is_reg)
 
     cb_fn = if is_reg
         () -> CatBoost.CatBoostRegressor(;
-        iterations=ITERS,
-        learning_rate=LR,
-        depth=DEPTH,
-        random_seed=SEED,
-        verbose=false,
-        loss_function=loss,
-        thread_count=N_THREADS,
-    )
+            iterations=ITERS,
+            learning_rate=LR,
+            depth=DEPTH,
+            random_seed=SEED,
+            verbose=false,
+            loss_function=loss,
+            thread_count=N_THREADS,
+        )
     else
         () -> CatBoost.CatBoostClassifier(;
-        iterations=ITERS,
-        learning_rate=LR,
-        depth=DEPTH,
-        random_seed=SEED,
-        verbose=false,
-        loss_function=loss,
-        thread_count=N_THREADS,
-    )
+            iterations=ITERS,
+            learning_rate=LR,
+            depth=DEPTH,
+            random_seed=SEED,
+            verbose=false,
+            loss_function=loss,
+            thread_count=N_THREADS,
+        )
     end
     mb_fn = if is_reg
         () -> MichiBoostRegressor(;
-        iterations=ITERS,
-        learning_rate=LR,
-        depth=DEPTH,
-        loss_function=loss,
-        random_seed=SEED,
-        verbose=false,
-    )
+            iterations=ITERS,
+            learning_rate=LR,
+            depth=DEPTH,
+            loss_function=loss,
+            random_seed=SEED,
+            verbose=false,
+        )
     else
         () -> MichiBoostClassifier(;
-        iterations=ITERS,
-        learning_rate=LR,
-        depth=DEPTH,
-        loss_function=loss,
-        random_seed=SEED,
-        verbose=false,
-    )
+            iterations=ITERS,
+            learning_rate=LR,
+            depth=DEPTH,
+            loss_function=loss,
+            random_seed=SEED,
+            verbose=false,
+        )
     end
 
     t_cb =
         median(@benchmark(CatBoost.fit!($cb_fn(), $cb_pool), samples = 3, evals = 1)).time /
         1e6
     t_mb =
-        median(
-            @benchmark(MichiBoost.fit!($mb_fn(), $mb_pool), samples = 3, evals = 1)
-        ).time / 1e6
+        median(@benchmark(MichiBoost.fit!($mb_fn(), $mb_pool), samples = 3, evals = 1)).time /
+        1e6
     return t_cb, t_mb
 end
 

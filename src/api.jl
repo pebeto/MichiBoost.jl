@@ -43,6 +43,10 @@ Accepts the same keyword arguments as [`MichiBoostRegressor`](@ref), plus:
 
 - `loss_function::String="Logloss"` — `"Logloss"` for binary, `"MultiClass"`
   for multi-class (auto-detected if omitted).
+- `class_weights::Union{AbstractDict,Nothing}=nothing` — per-class weights as a
+  `Dict(label => weight)`; multiplies into the per-sample weights at fit time.
+  Useful for imbalanced classification when adjusting per-row weights via
+  [`Pool`](@ref) is inconvenient.
 
 # Example
 ```julia
@@ -50,6 +54,10 @@ model = MichiBoostClassifier(; iterations=200, depth=4)
 fit!(model, X, y)
 probs = predict_proba(model, X_test)   # probabilities
 labels = predict(model, X_test)        # class labels
+
+# Imbalanced binary: upweight the positive class 5×
+clf = MichiBoostClassifier(; iterations=200, class_weights=Dict(0.0 => 1.0, 1.0 => 5.0))
+fit!(clf, X, y)
 ```
 """
 function MichiBoostClassifier(; kwargs...)
@@ -108,6 +116,13 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
     p = merge(m.params, Dict{Symbol,Any}(kwargs...))
     default_loss = m isa MichiBoostRegressor ? "RMSE" : "Logloss"
 
+    cw = get(p, :class_weights, nothing)
+    if cw !== nothing
+        m isa MichiBoostClassifier ||
+            error("`class_weights` is only valid for MichiBoostClassifier")
+        pool = _apply_class_weights(pool, cw)
+    end
+
     m.model = train(
         pool;
         iterations=Int(get(p, :iterations, 1000)),
@@ -129,6 +144,62 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
         boosting_type=String(get(p, :boosting_type, "Ordered")),
     )
     return m
+end
+
+# Return a new Pool whose `weight` has been multiplied by the per-class weight
+# from `class_weights[label]`. Numeric keys are matched against `pool.label`
+# (Float64) by value, non-numeric keys are matched against `pool.label_classes`.
+function _apply_class_weights(pool::Pool, class_weights::AbstractDict)
+    pool.label === nothing && error("`class_weights` requires a labelled Pool")
+    n = pool.n_samples
+    label_classes = pool.label_classes
+    label_floats = pool.label
+
+    # Resolve class_weights into a Float64-keyed map on the float-encoded label
+    # space. Pool stores labels as Float64; if labels were non-numeric, the
+    # originals live in `label_classes` with mapping
+    # `label_classes[i] -> Float64(i - 1)`.
+    cw_float = Dict{Float64,Float64}()
+    if label_classes !== nothing
+        for (i, original) in enumerate(label_classes)
+            cw_float[Float64(i - 1)] = _lookup_class_weight(class_weights, original)
+        end
+    else
+        for fl in unique(label_floats)
+            cw_float[fl] = _lookup_class_weight(class_weights, fl)
+        end
+    end
+
+    new_weights = pool.weight !== nothing ? copy(pool.weight) : ones(Float64, n)
+    @inbounds for i in 1:n
+        new_weights[i] *= cw_float[label_floats[i]]
+    end
+
+    return Pool(
+        pool.features_numerical,
+        pool.features_categorical,
+        pool.cat_mapping,
+        pool.label,
+        pool.label_mapping,
+        pool.label_classes,
+        pool.feature_names,
+        pool.numerical_feature_indices,
+        pool.categorical_feature_indices,
+        pool.n_samples,
+        pool.n_features,
+        new_weights,
+        pool.group_id,
+    )
+end
+
+function _lookup_class_weight(class_weights::AbstractDict, key)
+    haskey(class_weights, key) && return Float64(class_weights[key])
+    # Fall back to value-equality so that Int(0) keys match Float64(0.0) labels
+    # and vice versa — common when users write `Dict(0 => 1.0, 1 => 5.0)`.
+    for (k, v) in class_weights
+        k == key && return Float64(v)
+    end
+    return error("`class_weights` is missing an entry for class `$key`")
 end
 
 """

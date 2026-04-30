@@ -64,24 +64,24 @@ function cb_train(X, y; loss="RMSE", cb_pool=nothing, iterations=ITERS)
     is_reg = loss in ("RMSE", "MAE")
     m = if is_reg
         CatBoost.CatBoostRegressor(;
-        iterations=iterations,
-        learning_rate=LR,
-        depth=DEPTH,
-        random_seed=SEED,
-        verbose=false,
-        loss_function=loss,
-        thread_count=N_THREADS,
-    )
+            iterations=iterations,
+            learning_rate=LR,
+            depth=DEPTH,
+            random_seed=SEED,
+            verbose=false,
+            loss_function=loss,
+            thread_count=N_THREADS,
+        )
     else
         CatBoost.CatBoostClassifier(;
-        iterations=iterations,
-        learning_rate=LR,
-        depth=DEPTH,
-        random_seed=SEED,
-        verbose=false,
-        loss_function=loss,
-        thread_count=N_THREADS,
-    )
+            iterations=iterations,
+            learning_rate=LR,
+            depth=DEPTH,
+            random_seed=SEED,
+            verbose=false,
+            loss_function=loss,
+            thread_count=N_THREADS,
+        )
     end
     CatBoost.fit!(m, pool)
     return m
@@ -90,22 +90,22 @@ end
 function mb_train(data, y; loss="RMSE", iterations=ITERS)
     m = if loss in ("RMSE", "MAE")
         MichiBoostRegressor(;
-        iterations=iterations,
-        learning_rate=LR,
-        depth=DEPTH,
-        loss_function=loss,
-        random_seed=SEED,
-        verbose=false,
-    )
+            iterations=iterations,
+            learning_rate=LR,
+            depth=DEPTH,
+            loss_function=loss,
+            random_seed=SEED,
+            verbose=false,
+        )
     else
         MichiBoostClassifier(;
-        iterations=iterations,
-        learning_rate=LR,
-        depth=DEPTH,
-        loss_function=loss,
-        random_seed=SEED,
-        verbose=false,
-    )
+            iterations=iterations,
+            learning_rate=LR,
+            depth=DEPTH,
+            loss_function=loss,
+            random_seed=SEED,
+            verbose=false,
+        )
     end
     MichiBoost.fit!(m, data, y)
     return m

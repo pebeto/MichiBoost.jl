@@ -80,13 +80,11 @@ function run_once(X_tr, y_tr, X_te, y_te)
         )
 
     t_mb =
-        median(
-            @benchmark(MichiBoost.fit!($mb_fn(), $jl_pool_tr), samples = 3, evals = 1)
-        ).time / 1e6
+        median(@benchmark(MichiBoost.fit!($mb_fn(), $jl_pool_tr), samples = 3, evals = 1)).time /
+        1e6
     t_cb =
-        median(
-            @benchmark(CatBoost.fit!($cb_fn(), $cb_pool_tr), samples = 3, evals = 1)
-        ).time / 1e6
+        median(@benchmark(CatBoost.fit!($cb_fn(), $cb_pool_tr), samples = 3, evals = 1)).time /
+        1e6
 
     mb = mb_fn()
     MichiBoost.fit!(mb, jl_pool_tr)
