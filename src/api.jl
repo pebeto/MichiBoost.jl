@@ -47,6 +47,10 @@ Accepts the same keyword arguments as [`MichiBoostRegressor`](@ref), plus:
   `Dict(label => weight)`; multiplies into the per-sample weights at fit time.
   Useful for imbalanced classification when adjusting per-row weights via
   [`Pool`](@ref) is inconvenient.
+- `auto_class_weights::Union{String,Nothing}=nothing` — automatic class weighting
+  derived from training-label frequencies. `"Balanced"` sets each weight to
+  `n / (n_classes * count[c])`; `"SqrtBalanced"` sets it to `sqrt(n / count[c])`.
+  Mutually exclusive with `class_weights`.
 
 # Example
 ```julia
@@ -117,9 +121,17 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
     default_loss = m isa MichiBoostRegressor ? "RMSE" : "Logloss"
 
     cw = get(p, :class_weights, nothing)
-    if cw !== nothing
-        m isa MichiBoostClassifier ||
-            error("`class_weights` is only valid for MichiBoostClassifier")
+    acw = get(p, :auto_class_weights, nothing)
+    if cw !== nothing || acw !== nothing
+        m isa MichiBoostClassifier || error(
+            "`class_weights` / `auto_class_weights` are only valid for MichiBoostClassifier",
+        )
+        cw === nothing ||
+            acw === nothing ||
+            error("`class_weights` and `auto_class_weights` are mutually exclusive")
+        if acw !== nothing
+            cw = _auto_class_weights(pool, String(acw))
+        end
         pool = _apply_class_weights(pool, cw)
     end
 
@@ -190,6 +202,40 @@ function _apply_class_weights(pool::Pool, class_weights::AbstractDict)
         new_weights,
         pool.group_id,
     )
+end
+
+# Compute a class_weights dict from label frequency. Matches CatBoost's
+# `auto_class_weights="Balanced"` (`n / (n_classes * count)`) and
+# `"SqrtBalanced"` (`sqrt(n / count)`).
+function _auto_class_weights(pool::Pool, mode::String)
+    pool.label === nothing && error("`auto_class_weights` requires a labelled Pool")
+    label = pool.label
+    counts = Dict{Float64,Int}()
+    @inbounds for v in label
+        counts[v] = get(counts, v, 0) + 1
+    end
+    n = length(label)
+    n_classes = length(counts)
+
+    weight = if mode == "Balanced"
+        c -> n / (n_classes * counts[c])
+    elseif mode == "SqrtBalanced"
+        c -> sqrt(n / counts[c])
+    else
+        error("`auto_class_weights` must be \"Balanced\" or \"SqrtBalanced\", got `$mode`")
+    end
+
+    cw = Dict{Any,Float64}()
+    if pool.label_classes !== nothing
+        for (i, original) in enumerate(pool.label_classes)
+            cw[original] = weight(Float64(i - 1))
+        end
+    else
+        for fl in keys(counts)
+            cw[fl] = weight(fl)
+        end
+    end
+    return cw
 end
 
 function _lookup_class_weight(class_weights::AbstractDict, key)

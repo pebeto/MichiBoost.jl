@@ -48,6 +48,18 @@ non-numeric keys match the original labels passed to [`Pool`](@ref) /
 [`fit!`](@ref). If a [`Pool`](@ref) already has per-row `weight` set, class
 weights are multiplied on top of it.
 
+For automatic weighting from label frequency, pass `auto_class_weights` instead:
+
+```julia
+clf = MichiBoostClassifier(; iterations=200, auto_class_weights="Balanced")
+```
+
+- `"Balanced"` — `weight[c] = n / (n_classes * count[c])`.
+- `"SqrtBalanced"` — `weight[c] = sqrt(n / count[c])`. Less aggressive than
+  `"Balanced"`.
+
+`class_weights` and `auto_class_weights` are mutually exclusive.
+
 ## Cross-Validation
 
 [`cv`](@ref) runs k-fold cross-validation on a [`Pool`](@ref) and returns per-fold and mean
