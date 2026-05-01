@@ -13,8 +13,16 @@ _Michi (ミチ) means cat in Japanese._
 - **Low-overhead inference** for single rows and small batches
 - Regression (RMSE, MAE), binary classification (Logloss), and multi-class (Softmax)
 - **SHAP values** for feature-level explanation of individual predictions
-- **Sample weights** — pass per-row importance via `Pool(...; weight=...)`
-- Cross-validation, early stopping, RSM feature subsampling, model serialization
+- **Sample and class weights** — per-row weights via `Pool(...; weight=...)`,
+  per-class via `class_weights=Dict(...)` or `auto_class_weights="Balanced"`
+- Cross-validation (with optional **stratification**), early stopping with
+  configurable **eval metrics** (AUC, F1, Accuracy, R², ...), RSM feature
+  subsampling, model serialization
+- **Convergence diagnostics**: `staged_predict` / `staged_predict_proba`,
+  `eval_metrics`, `get_best_iteration` / `get_best_score`
+- **Compile-time-checked enums** for `loss_function`, `boosting_type`,
+  `eval_metric`, etc. via `Losses.*`, `BoostingTypes.*`, `Metrics.*`
+  submodules; CatBoost-style strings still accepted
 
 ## Installation
 

@@ -50,6 +50,7 @@ export MichiBoostClassifier, MichiBoostRegressor
 export AutoClassWeights, BoostingTypes, Losses, Metrics, PredictionTypes
 export Pool
 export cv
+export eval_metrics
 export feature_importance
 export fit!
 export get_best_iteration, get_best_score

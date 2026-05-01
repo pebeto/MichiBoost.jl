@@ -17,6 +17,12 @@ get_best_iteration
 get_best_score
 ```
 
+## Per-Iteration Metric Evaluation
+
+```@docs
+eval_metrics
+```
+
 ## SHAP Feature Attributions
 
 ```@docs

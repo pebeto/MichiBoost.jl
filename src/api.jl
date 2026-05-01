@@ -484,6 +484,80 @@ function staged_predict_proba(m::MichiBoostClassifier, data; cat_features=nothin
     )
 end
 
+"""
+    eval_metrics(model, pool::Pool; metrics) -> Dict{String,Vector{Float64}}
+
+Evaluate one or more metrics on a labelled `Pool` at every boosting iteration.
+Mirrors CatBoost's `eval_metrics`: returns a dictionary keyed by canonical
+metric name, with each value a vector of length `n_iterations` giving the
+metric's value after `i` trees have been added.
+
+`metrics` is a vector of `Metrics.*` tag types and/or CatBoost-style strings
+(e.g. `[Metrics.AUC, "Logloss"]`). Each metric must be valid for the model's
+task (regression / binary / multi-class), or it errors.
+
+# Example
+```julia
+result = eval_metrics(model, val_pool; metrics=[Metrics.AUC, Metrics.Logloss])
+result["AUC"]      # Vector{Float64}, length == length(model.trees)
+result["Logloss"]
+```
+"""
+function eval_metrics(m::MichiBoostWrapper, pool::Pool; metrics::AbstractVector)
+    m.model === nothing && error("Model has not been trained. Call fit! first.")
+    pool.label === nothing && error("`eval_metrics` requires a labelled Pool")
+
+    model = m.model
+    n_iter = length(model.trees)
+    raw = _staged_predict_raw(model, pool)
+
+    y_raw = get_label(pool)
+    y_eval = if model.is_multiclass
+        # Build one-hot for multi-class metrics. The label-index mapping mirrors
+        # the one `train` uses (sort + enumerate), so test pools with the same
+        # class set produce consistent indices. Rows whose class is unseen at
+        # training time are left all-zero — they contribute zero target mass.
+        classes = sort(unique(y_raw))
+        label_map = Dict(classes[i] => i for i in eachindex(classes))
+        oh = zeros(Float64, length(y_raw), model.n_classes)
+        @inbounds for i in eachindex(y_raw)
+            c = get(label_map, y_raw[i], 0)
+            c > 0 && (oh[i, c] = 1.0)
+        end
+        oh
+    else
+        y_raw
+    end
+
+    out = Dict{String,Vector{Float64}}()
+    for metric in metrics
+        metric_type = if metric isa AbstractString
+            _resolve_metric(metric)
+        elseif metric isa Type && metric <: Metric
+            metric
+        else
+            error(
+                "each entry in `metrics` must be a `Metrics.*` tag or a String, " *
+                "got `$(typeof(metric))`",
+            )
+        end
+        _, fn = _eval_metric(metric_type, model.is_multiclass, model.n_classes)
+
+        values = Vector{Float64}(undef, n_iter)
+        @inbounds for it in 1:n_iter
+            iter_raw = if model.is_multiclass
+                @view raw[:, :, it]
+            else
+                @view raw[:, it]
+            end
+            values[it] = fn(y_eval, iter_raw)
+        end
+        out[string(nameof(metric_type))] = values
+    end
+
+    return out
+end
+
 function _predict_raw(model::MichiBoostModel, pool::Pool)
     n = pool.n_samples
     num_bins = if n_numerical(pool) > 0
