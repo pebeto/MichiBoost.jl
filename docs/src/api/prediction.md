@@ -12,6 +12,13 @@ predict_proba
 predict_classes
 ```
 
+## Per-Iteration Predictions
+
+```@docs
+staged_predict
+staged_predict_proba
+```
+
 The [`predict`](@ref) function accepts a `prediction_type` keyword argument.
 Pass either a `PredictionTypes.*` tag or its CatBoost-style string:
 

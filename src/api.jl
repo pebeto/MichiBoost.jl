@@ -362,6 +362,128 @@ Return predicted class labels from a trained classifier.  Equivalent to
 """
 function predict_classes end  # Actual method is on MichiBoostModel in predict.jl
 
+# Build a per-iteration raw-score array by running each tree in sequence and
+# snapshotting the running prediction after every addition.
+#
+# Returns:
+# - regression / binary : Matrix{Float64} of shape (n_samples, n_iterations).
+# - multi-class         : Array{Float64,3} of shape (n_samples, n_classes, n_iter).
+function _staged_predict_raw(model::MichiBoostModel, pool::Pool)
+    n = pool.n_samples
+    n_iter = length(model.trees)
+    num_bins = if n_numerical(pool) > 0
+        apply_borders(pool.features_numerical, model.borders)
+    else
+        Matrix{UInt16}(undef, n, 0)
+    end
+    cat_enc = if n_categorical(pool) > 0 && model.encoder !== nothing
+        encode_categorical(model.encoder, pool.features_categorical)
+    else
+        Matrix{Float64}(undef, n, 0)
+    end
+    leaf_buf = Vector{Int}(undef, n)
+
+    if model.is_multiclass
+        n_classes = model.n_classes
+        out = Array{Float64,3}(undef, n, n_classes, n_iter)
+        running = repeat((model.initial_pred::Vector{Float64})', n, 1)
+        @inbounds for (i, tree) in enumerate(model.trees)
+            predict_tree!(running, tree, num_bins, cat_enc, model.learning_rate, leaf_buf)
+            @views out[:, :, i] .= running
+        end
+        return out
+    else
+        out = Matrix{Float64}(undef, n, n_iter)
+        running = fill(model.initial_pred::Float64, n)
+        @inbounds for (i, tree) in enumerate(model.trees)
+            predict_tree!(running, tree, num_bins, cat_enc, model.learning_rate, leaf_buf)
+            @views out[:, i] .= running
+        end
+        return out
+    end
+end
+
+"""
+    staged_predict(model, data; prediction_type=PredictionTypes.Class, cat_features=nothing)
+
+Return predictions at every boosting iteration as an array. Useful for plotting
+convergence curves or picking a truncation point post-hoc.
+
+# Returns
+
+- **Regressor**: `Matrix{Float64}` of shape `(n_samples, n_iterations)`.
+- **Binary classifier** with `Class`: `Matrix` of class labels of shape
+  `(n_samples, n_iterations)`.
+- **Binary classifier** with `Probability` or `RawFormulaVal`: `Matrix{Float64}`
+  of shape `(n_samples, n_iterations)`.
+- **Multi-class** with `Class`: `Matrix` of class labels.
+- **Multi-class** with `Probability` or `RawFormulaVal`: `Array{Float64,3}` of
+  shape `(n_samples, n_classes, n_iterations)`.
+
+The return is densely materialised; memory cost is `n_samples × n_iterations`
+(times `n_classes` for multi-class).
+"""
+function staged_predict(
+    m::MichiBoostWrapper, data; prediction_type=PredictionTypes.Class, cat_features=nothing
+)
+    m.model === nothing && error("Model has not been trained. Call fit! first.")
+    pool = data isa Pool ? data : Pool(data; cat_features)
+    pt = _to_string(prediction_type, PredictionType, _prediction_name, "prediction_type")
+    raw = _staged_predict_raw(m.model, pool)
+
+    pt == "RawFormulaVal" && return raw
+    m isa MichiBoostClassifier || return raw   # regression: raw == values
+
+    model = m.model
+    if model.is_multiclass
+        n, k, niter = size(raw)
+        if pt == "Probability"
+            out = similar(raw)
+            @inbounds for it in 1:niter
+                _softmax_matrix!(view(out,:,:,it), view(raw,:,:,it))
+            end
+            return out
+        end
+        # Class labels: argmax across the class axis at each iteration.
+        out = Matrix{eltype(model.class_labels)}(undef, n, niter)
+        @inbounds for it in 1:niter, i in 1:n
+            best_c = argmax(view(raw, i, :, it))
+            out[i, it] = model.class_labels[best_c]
+        end
+        return out
+    else
+        # Binary classifier.
+        n, niter = size(raw)
+        if pt == "Probability"
+            return _sigmoid.(raw)
+        end
+        out = Matrix{eltype(model.class_labels)}(undef, n, niter)
+        @inbounds for it in 1:niter, i in 1:n
+            out[i, it] = raw[i, it] >= 0.0 ? model.class_labels[2] : model.class_labels[1]
+        end
+        return out
+    end
+end
+
+"""
+    staged_predict_proba(model::MichiBoostClassifier, data; cat_features=nothing)
+
+Per-iteration probabilities from a trained classifier. Equivalent to
+`staged_predict(model, data; prediction_type=PredictionTypes.Probability)`.
+
+# Returns
+
+- **Binary**: `Matrix{Float64}` of shape `(n_samples, n_iterations)` —
+  P(positive class) at each iteration.
+- **Multi-class**: `Array{Float64,3}` of shape
+  `(n_samples, n_classes, n_iterations)`.
+"""
+function staged_predict_proba(m::MichiBoostClassifier, data; cat_features=nothing)
+    return staged_predict(
+        m, data; prediction_type=PredictionTypes.Probability, cat_features
+    )
+end
+
 function _predict_raw(model::MichiBoostModel, pool::Pool)
     n = pool.n_samples
     num_bins = if n_numerical(pool) > 0

@@ -27,6 +27,7 @@ end
     include("api/shap.jl")
     include("api/tag_types.jl")
     include("api/best_iteration.jl")
+    include("api/staged_predict.jl")
 end
 
 Aqua.test_all(MichiBoost)

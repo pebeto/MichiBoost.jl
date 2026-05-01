@@ -58,5 +58,6 @@ export predict, predict_classes, predict_proba
 export score
 export shap_values
 export slice
+export staged_predict, staged_predict_proba
 
 end # module
