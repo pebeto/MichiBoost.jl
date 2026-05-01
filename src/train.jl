@@ -319,6 +319,9 @@ function train(
         end
     end
 
+    final_best_iteration = es_active ? best_iter : length(trees)
+    final_best_score = es_active ? best_eval_value : nothing
+
     return MichiBoostModel(
         trees,
         learning_rate,
@@ -331,5 +334,7 @@ function train(
         is_multiclass,
         pool.numerical_feature_indices,
         pool.categorical_feature_indices,
+        final_best_iteration,
+        final_best_score,
     )
 end

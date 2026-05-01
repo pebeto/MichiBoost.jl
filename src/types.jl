@@ -346,6 +346,13 @@ mutable struct MichiBoostModel
     is_multiclass::Bool
     numerical_feature_indices::Vector{Int}
     categorical_feature_indices::Vector{Int}
+    # Early-stopping state surfaced to the public API. `best_iteration` is the
+    # iteration whose eval-metric value was best (1-indexed) when early stopping
+    # was active; otherwise it equals the number of trees actually built.
+    # `best_score` is the eval-metric value at `best_iteration`, or `nothing`
+    # when early stopping was not active.
+    best_iteration::Int
+    best_score::Union{Float64,Nothing}
 end
 
 """

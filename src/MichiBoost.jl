@@ -52,6 +52,7 @@ export Pool
 export cv
 export feature_importance
 export fit!
+export get_best_iteration, get_best_score
 export load_model, save_model
 export predict, predict_classes, predict_proba
 export score

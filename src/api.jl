@@ -462,6 +462,32 @@ function feature_importance(m::MichiBoostWrapper)
 end
 
 """
+    get_best_iteration(model) -> Int
+
+Return the iteration that achieved the best eval-metric value during early
+stopping (1-indexed). If early stopping was not active, returns the total
+number of iterations actually completed (i.e., `length(model.trees)`).
+"""
+function get_best_iteration(m::MichiBoostWrapper)
+    m.model === nothing && error("Model has not been trained. Call fit! first.")
+    return get_best_iteration(m.model)
+end
+get_best_iteration(model::MichiBoostModel) = model.best_iteration
+
+"""
+    get_best_score(model) -> Union{Float64,Nothing}
+
+Return the eval-metric value at [`get_best_iteration`](@ref). Returns `nothing`
+when early stopping was not active (no `eval_set` / `early_stopping_rounds`
+supplied at fit time).
+"""
+function get_best_score(m::MichiBoostWrapper)
+    m.model === nothing && error("Model has not been trained. Call fit! first.")
+    return get_best_score(m.model)
+end
+get_best_score(model::MichiBoostModel) = model.best_score
+
+"""
     score(model, data, y; cat_features=nothing) -> Float64
 
 Compute a default score for the trained model on `(data, y)`:

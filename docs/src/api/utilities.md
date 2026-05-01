@@ -10,6 +10,13 @@ CurrentModule = MichiBoost
 feature_importance
 ```
 
+## Early-Stopping Inspection
+
+```@docs
+get_best_iteration
+get_best_score
+```
+
 ## SHAP Feature Attributions
 
 ```@docs

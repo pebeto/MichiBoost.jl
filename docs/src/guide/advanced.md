@@ -98,6 +98,28 @@ result = cv(
 
 Stratified CV requires every class to have at least `fold_count` samples.
 
+## Early-Stopping Inspection
+
+After training with `early_stopping_rounds` and `eval_set`, two accessors expose
+the best round and its eval-metric value (matching CatBoost's
+`get_best_iteration` / `get_best_score`):
+
+```julia
+clf = MichiBoostClassifier(;
+    iterations=1000,
+    early_stopping_rounds=20,
+    eval_metric=Metrics.AUC,
+)
+fit!(clf, train_pool; eval_set=val_pool)
+
+println("Best iteration: ", get_best_iteration(clf))
+println("Best AUC:       ", get_best_score(clf))
+```
+
+When early stopping was not active (no `eval_set` / `early_stopping_rounds`),
+`get_best_iteration` returns the total number of trees actually built and
+`get_best_score` returns `nothing`.
+
 The returned `NamedTuple` exposes `train_loss`, `test_loss`, `mean_train_loss`,
 and `mean_test_loss`. Keys in `params` may be strings or symbols. The loss
 function used is taken from `params[:loss_function]` (default `"RMSE"`).
