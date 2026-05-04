@@ -558,6 +558,39 @@ function eval_metrics(m::MichiBoostWrapper, pool::Pool; metrics::AbstractVector)
     return out
 end
 
+"""
+    shrink(model, n::Integer) -> model
+
+Truncate the model's ensemble to its first `n` trees in place. Pure metadata
+change — predictions made after `shrink` use only the retained trees. Useful
+for selecting a prefix of an early-stopped model (e.g., to roll back to the
+[`get_best_iteration`](@ref) snapshot) and for snapshot / resume workflows.
+
+`n` must satisfy `0 <= n <= length(model.trees)`. The model is returned for
+chaining; [`get_best_iteration`](@ref) / [`get_best_score`](@ref) are preserved
+as recorded during training and may now exceed `length(model.trees)`.
+
+# Example
+```julia
+clf = MichiBoostClassifier(; iterations=200, early_stopping_rounds=10, ...)
+fit!(clf, train_pool; eval_set=val_pool)
+shrink(clf, get_best_iteration(clf))   # roll back to the ES best
+```
+"""
+function shrink(m::MichiBoostWrapper, n::Integer)
+    m.model === nothing && error("Model has not been trained. Call fit! first.")
+    shrink(m.model, n)
+    return m
+end
+
+function shrink(model::MichiBoostModel, n::Integer)
+    n_current = length(model.trees)
+    (n < 0 || n > n_current) &&
+        error("`n` must be in [0, $n_current], got $n")
+    resize!(model.trees, n)
+    return model
+end
+
 function _predict_raw(model::MichiBoostModel, pool::Pool)
     n = pool.n_samples
     num_bins = if n_numerical(pool) > 0

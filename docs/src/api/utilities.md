@@ -17,6 +17,12 @@ get_best_iteration
 get_best_score
 ```
 
+## Truncation
+
+```@docs
+shrink
+```
+
 ## Per-Iteration Metric Evaluation
 
 ```@docs

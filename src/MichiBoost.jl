@@ -58,6 +58,7 @@ export load_model, save_model
 export predict, predict_classes, predict_proba
 export score
 export shap_values
+export shrink
 export slice
 export staged_predict, staged_predict_proba
 

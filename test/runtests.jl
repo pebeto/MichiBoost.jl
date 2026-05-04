@@ -29,6 +29,7 @@ end
     include("api/best_iteration.jl")
     include("api/staged_predict.jl")
     include("api/eval_metrics.jl")
+    include("api/shrink.jl")
 end
 
 Aqua.test_all(MichiBoost)
