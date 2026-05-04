@@ -54,6 +54,7 @@ export eval_metrics
 export feature_importance
 export fit!
 export get_best_iteration, get_best_score
+export is_fitted
 export load_model, save_model
 export predict, predict_classes, predict_proba
 export score

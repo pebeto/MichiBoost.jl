@@ -62,9 +62,7 @@ end
     )
     fit!(clf, pool)
 
-    res = eval_metrics(
-        clf, pool; metrics=[Metrics.MultiLogloss, Metrics.Accuracy]
-    )
+    res = eval_metrics(clf, pool; metrics=[Metrics.MultiLogloss, Metrics.Accuracy])
     @test Set(keys(res)) == Set(["MultiLogloss", "Accuracy"])
     @test length(res["MultiLogloss"]) == iters
     @test length(res["Accuracy"]) == iters
@@ -93,7 +91,9 @@ end
     y = randn(20)
     fit!(model, X, y)
     @test_throws ErrorException eval_metrics(
-        model, Pool(X); metrics=[Metrics.RMSE]   # this pool has no label
+        model,
+        Pool(X);
+        metrics=[Metrics.RMSE],   # this pool has no label
     )
 end
 

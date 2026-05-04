@@ -10,6 +10,12 @@ CurrentModule = MichiBoost
 feature_importance
 ```
 
+## Model State
+
+```@docs
+is_fitted
+```
+
 ## Early-Stopping Inspection
 
 ```@docs

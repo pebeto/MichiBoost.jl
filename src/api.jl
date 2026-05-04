@@ -585,8 +585,7 @@ end
 
 function shrink(model::MichiBoostModel, n::Integer)
     n_current = length(model.trees)
-    (n < 0 || n > n_current) &&
-        error("`n` must be in [0, $n_current], got $n")
+    (n < 0 || n > n_current) && error("`n` must be in [0, $n_current], got $n")
     resize!(model.trees, n)
     return model
 end
@@ -689,6 +688,23 @@ function feature_importance(m::MichiBoostWrapper)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
     return feature_importance(m.model)
 end
+
+"""
+    is_fitted(model) -> Bool
+
+Return `true` if `model` has been trained (i.e., [`fit!`](@ref) has populated
+its underlying [`MichiBoostModel`](@ref)), `false` otherwise. Use it to guard
+prediction or inspection calls against untrained wrappers.
+
+# Example
+```julia
+model = MichiBoostRegressor(; iterations=100)
+is_fitted(model)              # false
+fit!(model, X, y)
+is_fitted(model)              # true
+```
+"""
+is_fitted(m::MichiBoostWrapper) = m.model !== nothing
 
 """
     get_best_iteration(model) -> Int
