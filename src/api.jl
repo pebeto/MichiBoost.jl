@@ -98,7 +98,7 @@ Train `model` in-place on the given data.
 - `data` — a table, matrix, or [`Pool`](@ref).
 - `labels` — target vector (ignored when `data` is a [`Pool`](@ref) that already
   has a label).
-- `cat_features` — categorical column indices (0-based) or names.
+- `cat_features` — 1-based categorical column indices or names.
 - `eval_set` — optional validation [`Pool`](@ref) for early stopping.
 - `kwargs...` — any hyperparameter accepted by the model constructor; overrides
   the values stored in `model.params` for this call only.
@@ -559,10 +559,10 @@ function eval_metrics(m::MichiBoostWrapper, pool::Pool; metrics::AbstractVector)
 end
 
 """
-    shrink(model, n::Integer) -> model
+    shrink!(model, n::Integer) -> model
 
 Truncate the model's ensemble to its first `n` trees in place. Pure metadata
-change — predictions made after `shrink` use only the retained trees. Useful
+change — predictions made after `shrink!` use only the retained trees. Useful
 for selecting a prefix of an early-stopped model (e.g., to roll back to the
 [`get_best_iteration`](@ref) snapshot) and for snapshot / resume workflows.
 
@@ -574,16 +574,16 @@ as recorded during training and may now exceed `length(model.trees)`.
 ```julia
 clf = MichiBoostClassifier(; iterations=200, early_stopping_rounds=10, ...)
 fit!(clf, train_pool; eval_set=val_pool)
-shrink(clf, get_best_iteration(clf))   # roll back to the ES best
+shrink!(clf, get_best_iteration(clf))   # roll back to the ES best
 ```
 """
-function shrink(m::MichiBoostWrapper, n::Integer)
+function shrink!(m::MichiBoostWrapper, n::Integer)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
-    shrink(m.model, n)
+    shrink!(m.model, n)
     return m
 end
 
-function shrink(model::MichiBoostModel, n::Integer)
+function shrink!(model::MichiBoostModel, n::Integer)
     n_current = length(model.trees)
     (n < 0 || n > n_current) && error("`n` must be in [0, $n_current], got $n")
     resize!(model.trees, n)
@@ -690,7 +690,7 @@ function feature_importance(m::MichiBoostWrapper)
 end
 
 """
-    is_fitted(model) -> Bool
+    isfitted(model) -> Bool
 
 Return `true` if `model` has been trained (i.e., [`fit!`](@ref) has populated
 its underlying [`MichiBoostModel`](@ref)), `false` otherwise. Use it to guard
@@ -699,12 +699,12 @@ prediction or inspection calls against untrained wrappers.
 # Example
 ```julia
 model = MichiBoostRegressor(; iterations=100)
-is_fitted(model)              # false
+isfitted(model)              # false
 fit!(model, X, y)
-is_fitted(model)              # true
+isfitted(model)              # true
 ```
 """
-is_fitted(m::MichiBoostWrapper) = m.model !== nothing
+isfitted(m::MichiBoostWrapper) = m.model !== nothing
 
 """
     get_params(model) -> Dict{Symbol,Any}

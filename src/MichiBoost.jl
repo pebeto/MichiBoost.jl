@@ -55,12 +55,12 @@ export feature_importance
 export fit!
 export get_best_iteration, get_best_score
 export get_params, set_params!
-export is_fitted
+export isfitted
 export load_model, save_model
 export predict, predict_classes, predict_proba
 export score
 export shap_values
-export shrink
+export shrink!
 export slice
 export staged_predict, staged_predict_proba
 

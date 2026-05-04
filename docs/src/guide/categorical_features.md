@@ -29,14 +29,14 @@ You can explicitly specify which features should be treated as categorical:
 ```julia
 using MichiBoost
 
-# Using column indices (0-based)
-pool = Pool(X; label=y, cat_features=[0, 2])
+# Using column indices (1-based)
+pool = Pool(X; label=y, cat_features=[1, 3])
 
 # Using column names
 pool = Pool(df; label=y, cat_features=[:color, :material])
 
 # Mix of indices and names
-pool = Pool(df; label=y, cat_features=[0, :material])
+pool = Pool(df; label=y, cat_features=[1, :material])
 ```
 
 ## How It Works: Ordered Target Statistics

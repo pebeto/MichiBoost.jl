@@ -9,9 +9,9 @@ Create a `Pool` from tabular data.
   vectors) or an `AbstractMatrix`.
 - `label`: target vector.  Numeric values are kept as-is; string / categorical
   values are automatically encoded to `Float64`.
-- `cat_features`: indices (0-based `Int`) or column names (`Symbol` / `String`)
-  of columns that should be treated as categorical.  String columns are
-  auto-detected even without this argument.
+- `cat_features`: 1-based column indices (`Int`) or column names
+  (`Symbol` / `String`) of columns that should be treated as categorical.
+  String columns are auto-detected even without this argument.
 - `text_features`: same format as `cat_features`; treated identically
   (as categorical).
 - `feature_names`: optional vector of column names.
@@ -142,7 +142,7 @@ function _collect_cat_indices!(set, features, fnames)
     features === nothing && return nothing
     for cf in features
         if cf isa Integer
-            push!(set, cf + 1)
+            push!(set, Int(cf))
         elseif cf isa Symbol || cf isa AbstractString
             idx = findfirst(==(Symbol(cf)), fnames)
             if idx !== nothing

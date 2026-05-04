@@ -13,7 +13,7 @@ feature_importance
 ## Model State
 
 ```@docs
-is_fitted
+isfitted
 ```
 
 ## Hyperparameter Access
@@ -33,7 +33,7 @@ get_best_score
 ## Truncation
 
 ```@docs
-shrink
+shrink!
 ```
 
 ## Per-Iteration Metric Evaluation

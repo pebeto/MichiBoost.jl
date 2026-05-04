@@ -30,7 +30,7 @@ end
     include("api/staged_predict.jl")
     include("api/eval_metrics.jl")
     include("api/shrink.jl")
-    include("api/is_fitted.jl")
+    include("api/isfitted.jl")
     include("api/params.jl")
 end
 
