@@ -31,6 +31,7 @@ end
     include("api/eval_metrics.jl")
     include("api/shrink.jl")
     include("api/is_fitted.jl")
+    include("api/params.jl")
 end
 
 Aqua.test_all(MichiBoost)

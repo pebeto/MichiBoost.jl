@@ -16,6 +16,13 @@ feature_importance
 is_fitted
 ```
 
+## Hyperparameter Access
+
+```@docs
+get_params
+set_params!
+```
+
 ## Early-Stopping Inspection
 
 ```@docs

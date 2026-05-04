@@ -707,6 +707,42 @@ is_fitted(model)              # true
 is_fitted(m::MichiBoostWrapper) = m.model !== nothing
 
 """
+    get_params(model) -> Dict{Symbol,Any}
+
+Return a copy of the hyperparameters stored on the wrapper. The returned `Dict`
+is independent of the wrapper's internal state — mutating it will not affect
+`model`. Use [`set_params!`](@ref) to update them.
+
+# Example
+```julia
+model = MichiBoostRegressor(; iterations=100, depth=4)
+get_params(model)   # Dict(:iterations => 100, :depth => 4, :loss_function => "RMSE")
+```
+"""
+get_params(m::MichiBoostWrapper) = copy(m.params)
+
+"""
+    set_params!(model; kwargs...) -> model
+
+Update hyperparameters on the wrapper, returning `model` for chaining. New keys
+are added; existing keys are overwritten. Changes only take effect on the next
+[`fit!`](@ref) call — already-trained models are not retrained.
+
+# Example
+```julia
+model = MichiBoostRegressor(; iterations=100)
+set_params!(model; iterations=500, depth=4)
+fit!(model, X, y)   # uses the updated values
+```
+"""
+function set_params!(m::MichiBoostWrapper; kwargs...)
+    for (k, v) in kwargs
+        m.params[k] = v
+    end
+    return m
+end
+
+"""
     get_best_iteration(model) -> Int
 
 Return the iteration that achieved the best eval-metric value during early
