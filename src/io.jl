@@ -1,8 +1,8 @@
 function save_model(model::MichiBoostModel, filepath::AbstractString)
-    open(io -> Serialization.serialize(io, model), filepath, "w")
+    JLD2.save_object(filepath, model)
     return nothing
 end
 
 function load_model(filepath::AbstractString)
-    return open(io -> Serialization.deserialize(io), filepath, "r")
+    return JLD2.load_object(filepath)
 end

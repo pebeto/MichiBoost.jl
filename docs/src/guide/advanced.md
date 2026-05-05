@@ -160,8 +160,9 @@ end
 ## Model Persistence
 
 Trained models can be serialized to disk and reloaded later. Serialization uses
-Julia's `Serialization` stdlib, so loaded files are only guaranteed to work
-with the same MichiBoost version that wrote them.
+[JLD2.jl](https://github.com/JuliaIO/JLD2.jl) (HDF5-flavoured), which is stable
+across Julia versions; struct-layout changes in MichiBoost itself may still
+require migration.
 
 ```julia
 using MichiBoost
@@ -169,9 +170,9 @@ using MichiBoost
 model = MichiBoostRegressor(; iterations=100)
 fit!(model, X_train, y_train)
 
-save_model(model, "model.jls")
+save_model(model, "model.jld2")
 
-loaded = load_model("model.jls")
+loaded = load_model("model.jld2")
 predictions = predict(loaded, Pool(X_test))
 ```
 

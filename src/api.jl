@@ -848,7 +848,8 @@ end
 """
     save_model(model, filepath::AbstractString)
 
-Serialize a trained model to disk using Julia's `Serialization` module.
+Serialize a trained model to disk using [JLD2.jl](https://github.com/JuliaIO/JLD2.jl)
+(HDF5-flavoured, version-stable across Julia versions).
 
 Works with both wrapper types ([`MichiBoostRegressor`](@ref),
 [`MichiBoostClassifier`](@ref)) and raw [`MichiBoostModel`](@ref) objects.
@@ -867,8 +868,8 @@ Load a model previously saved with [`save_model`](@ref).
 
 # Example
 ```julia
-save_model(model, "my_model.jls")
-loaded = load_model("my_model.jls")
+save_model(model, "my_model.jld2")
+loaded = load_model("my_model.jld2")
 predict(loaded, X_test)  # works with the raw MichiBoostModel
 ```
 """
