@@ -1,3 +1,45 @@
+"""
+    LossFunction
+
+Abstract supertype for boosting loss functions. Subtype this to plug a custom
+loss into [`MichiBoostRegressor`](@ref) (regression) or
+[`MichiBoostClassifier`](@ref) (binary / multi-class). Required methods:
+
+```julia
+import MichiBoost: gradient_hessian!, initial_prediction, loss
+# Optional traits (defaults: :regression and identity)
+import MichiBoost: task_type, link_inverse
+
+struct MyLoss <: MichiBoost.LossFunction end
+
+# Optional: declare the task — :regression (default), :binary, or :multiclass.
+# Drives label encoding and the shape of the buffers passed to gradient_hessian!.
+task_type(::MyLoss) = :regression
+
+# Optional: applied at predict time to turn raw scores into probabilities.
+# Identity by default; provide sigmoid for :binary, row-wise softmax for :multiclass.
+link_inverse(::MyLoss, raw) = raw
+
+# Required: fused, in-place gradient + hessian. Buffer shapes match `task_type`:
+#   :regression / :binary   → vectors  (length n_samples)
+#   :multiclass             → matrices (n_samples × n_classes)
+# `scratch` is a same-shape buffer the engine reuses; ignore it if unused.
+gradient_hessian!(g, h, ::MyLoss, y, pred, scratch) = ...
+
+# Required: starting boosting prediction. Scalar for regression / binary;
+# `Vector{Float64}` of length n_classes for multiclass.
+initial_prediction(::MyLoss, y) = ...
+
+# Required: scalar training loss; used for the verbose log and as the default
+# early-stopping signal.
+loss(::MyLoss, y, pred) = ...
+```
+
+The wrapper validates that `task_type` matches the wrapper:
+`:regression` requires [`MichiBoostRegressor`](@ref); `:binary` and
+`:multiclass` require [`MichiBoostClassifier`](@ref). See the
+"Custom Loss Functions" guide for full examples.
+"""
 abstract type LossFunction end
 
 struct RMSELoss <: LossFunction end
@@ -353,6 +395,11 @@ mutable struct MichiBoostModel
     # when early stopping was not active.
     best_iteration::Int
     best_score::Union{Float64,Nothing}
+    # Set when the user trained with a custom `LossFunction`. `predict` and
+    # `predict_proba` route through `link_inverse(custom_loss, raw)` instead of
+    # the built-in sigmoid/softmax when this is non-`nothing`. Required for
+    # round-trip through save_model / load_model.
+    custom_loss::Union{LossFunction,Nothing}
 end
 
 """

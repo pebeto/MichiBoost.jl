@@ -47,7 +47,7 @@ include("trees/shap.jl")
 include("api.jl")
 
 export MichiBoostClassifier, MichiBoostRegressor
-export AutoClassWeights, BoostingTypes, Losses, Metrics, PredictionTypes
+export AutoClassWeights, BoostingTypes, Losses, LossFunction, Metrics, PredictionTypes
 export Pool
 export cv
 export eval_metrics

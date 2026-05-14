@@ -12,6 +12,8 @@ _Michi (ミチ) means cat in Japanese._
 - **Histogram-based split finding** with quantile-based feature binning and pre-allocated buffers
 - **Low-overhead inference** for single rows and small batches
 - Regression (RMSE, MAE), binary classification (Logloss), and multi-class (Softmax)
+- **Custom loss functions** — subtype `LossFunction` for regression, binary,
+  or multi-class via the `task_type` / `link_inverse` traits
 - **SHAP values** for feature-level explanation of individual predictions
 - **Sample and class weights** — per-row weights via `Pool(...; weight=...)`,
   per-class via `class_weights=Dict(...)` or `auto_class_weights="Balanced"`

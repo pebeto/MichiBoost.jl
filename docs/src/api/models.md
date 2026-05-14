@@ -21,3 +21,9 @@ MichiBoostClassifier
 ```@docs
 MichiBoostModel
 ```
+
+## Custom Losses
+
+```@docs
+LossFunction
+```

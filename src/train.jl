@@ -4,7 +4,7 @@ function train(
     learning_rate::Float64=0.03,
     depth::Int=6,
     l2_leaf_reg::Float64=3.0,
-    loss_function::String="RMSE",
+    loss_function::Union{String,LossFunction}="RMSE",
     border_count::Int=254,
     min_data_in_leaf::Int=1,
     random_seed::Union{Int,Nothing}=nothing,
@@ -25,9 +25,20 @@ function train(
 
     qf = quantize_features(pool.features_numerical; border_count)
 
-    is_classification = uppercase(loss_function) in
-    ("LOGLOSS", "CROSSENTROPY", "MULTICLASS", "MULTILOGLOSS")
-    is_multiclass = uppercase(loss_function) in ("MULTICLASS", "MULTILOGLOSS")
+    # Custom LossFunction instances declare their task via `task_type`; built-in
+    # string names route through the original switch.
+    is_custom_loss = loss_function isa LossFunction
+    custom_task = is_custom_loss ? task_type(loss_function) : nothing
+    is_classification = if is_custom_loss
+        custom_task === :binary || custom_task === :multiclass
+    else
+        uppercase(loss_function) in ("LOGLOSS", "CROSSENTROPY", "MULTICLASS", "MULTILOGLOSS")
+    end
+    is_multiclass = if is_custom_loss
+        custom_task === :multiclass
+    else
+        uppercase(loss_function) in ("MULTICLASS", "MULTILOGLOSS")
+    end
 
     class_labels = Float64[]
     y = copy(label)
@@ -37,6 +48,11 @@ function train(
         class_labels = sort(unique(label))
         n_classes = length(class_labels)
         if n_classes > 2
+            is_custom_loss && error(
+                "Custom binary `LossFunction` was given but training labels have " *
+                "$n_classes unique values; declare `task_type(::MyLoss) = :multiclass` " *
+                "and implement the matrix-shaped contract instead.",
+            )
             is_multiclass = true
             loss_function = "MultiClass"
         else
@@ -81,7 +97,7 @@ function train(
         )
     end
 
-    lf = make_loss(loss_function; n_classes)
+    lf = is_custom_loss ? loss_function : make_loss(loss_function; n_classes)
 
     # Initial predictions
     if is_multiclass
@@ -199,8 +215,8 @@ function train(
     for iter in 1:iterations
         if is_multiclass
             gradient_hessian!(grads_buf, hess_buf, lf, y_onehot, predictions, scratch_buf)
-            @. grads_buf *= weights
-            @. hess_buf *= weights
+            grads_buf .*= weights
+            hess_buf .*= weights
             tree = build_symmetric_tree(
                 grads_buf,
                 hess_buf,
@@ -226,14 +242,14 @@ function train(
             )
         else
             gradient_hessian!(grads_buf, hess_buf, lf, y, predictions, scratch_buf)
-            @. grads_buf *= weights
-            @. hess_buf *= weights
+            grads_buf .*= weights
+            hess_buf .*= weights
             # MAE is non-smooth: surrogate gradients (±1) drive split-finding,
             # but leaf values must come from the residual weighted median —
             # otherwise each round can shift predictions by at most
             # learning_rate × 1, causing severe underfitting.
             if use_refine
-                @. refine_buf = y - predictions
+                refine_buf .= y .- predictions
             end
             tree = build_symmetric_tree(
                 grads_buf,
@@ -336,5 +352,6 @@ function train(
         pool.categorical_feature_indices,
         final_best_iteration,
         final_best_score,
+        is_custom_loss ? loss_function : nothing,
     )
 end

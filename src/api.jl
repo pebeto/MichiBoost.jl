@@ -8,10 +8,15 @@ Create a gradient-boosted regression model.
 - `learning_rate::Float64=0.03` — step-size shrinkage applied to each tree.
 - `depth::Int=6` — depth of each symmetric tree.
 - `l2_leaf_reg::Float64=3.0` — L2 regularisation on leaf values.
-- `loss_function::Union{Type{<:Losses.LossKind},String}="RMSE"` — pass a
-  `Losses.*` tag type (e.g., `Losses.RMSE`) or a CatBoost-style string. For
-  regression: `Losses.RMSE` / `Losses.MAE`. For classification: `Losses.Logloss`,
-  `Losses.MultiClass` (auto-detected on classifier targets).
+- `loss_function::Union{Type{<:Losses.LossKind},String,LossFunction}="RMSE"` —
+  pass a `Losses.*` tag type (e.g., `Losses.RMSE`), a CatBoost-style string,
+  or a custom [`LossFunction`](@ref) instance. Built-in regression options:
+  `Losses.RMSE` / `Losses.MAE`. Built-in classification options:
+  `Losses.Logloss`, `Losses.MultiClass` (auto-detected on classifier targets).
+  Custom `LossFunction` instances declare their task via
+  `task_type(::MyLoss)`; the wrapper enforces that `:regression` losses go to
+  `MichiBoostRegressor` and `:binary` / `:multiclass` losses go to
+  `MichiBoostClassifier`. See [`LossFunction`](@ref).
 - `border_count::Int=254` — max quantization borders per numerical feature.
 - `min_data_in_leaf::Int=1` — minimum samples required in a leaf.
 - `random_seed::Union{Int,Nothing}=nothing` — seed for reproducibility.
@@ -134,6 +139,27 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
     p = merge(m.params, Dict{Symbol,Any}(kwargs...))
     default_loss = m isa MichiBoostRegressor ? "RMSE" : "Logloss"
 
+    raw_loss = get(p, :loss_function, default_loss)
+    resolved_loss = if raw_loss isa LossFunction
+        tt = task_type(raw_loss)
+        if tt === :regression
+            m isa MichiBoostRegressor || error(
+                "Custom regression `LossFunction` requires `MichiBoostRegressor`."
+            )
+        elseif tt === :binary || tt === :multiclass
+            m isa MichiBoostClassifier ||
+                error("Custom $tt `LossFunction` requires `MichiBoostClassifier`.")
+        else
+            error(
+                "task_type(::$(typeof(raw_loss))) returned `$tt`; expected " *
+                "`:regression`, `:binary`, or `:multiclass`.",
+            )
+        end
+        raw_loss
+    else
+        _to_string(raw_loss, LossKind, _loss_name, "loss_function")
+    end
+
     cw = get(p, :class_weights, nothing)
     acw = get(p, :auto_class_weights, nothing)
     if cw !== nothing || acw !== nothing
@@ -160,9 +186,7 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
         learning_rate=Float64(get(p, :learning_rate, 0.03)),
         depth=Int(get(p, :depth, 6)),
         l2_leaf_reg=Float64(get(p, :l2_leaf_reg, 3.0)),
-        loss_function=_to_string(
-            get(p, :loss_function, default_loss), LossKind, _loss_name, "loss_function"
-        ),
+        loss_function=resolved_loss,
         border_count=Int(get(p, :border_count, 254)),
         min_data_in_leaf=Int(get(p, :min_data_in_leaf, 1)),
         random_seed=let v = get(p, :random_seed, nothing)
@@ -978,9 +1002,12 @@ function cv(
     else
         _kfold_folds(n, fold_count, shuffle, rng)
     end
-    loss_fn = _to_string(
-        get(all_params, :loss_function, "RMSE"), LossKind, _loss_name, "loss_function"
-    )
+    raw_loss = get(all_params, :loss_function, "RMSE")
+    loss_fn = if raw_loss isa LossFunction
+        raw_loss
+    else
+        _to_string(raw_loss, LossKind, _loss_name, "loss_function")
+    end
     boosting = _to_string(
         get(all_params, :boosting_type, "Ordered"),
         BoostingType,
@@ -1012,7 +1039,7 @@ function cv(
             random_seed=random_seed,
         )
 
-        lf = make_loss(loss_fn)
+        lf = loss_fn isa LossFunction ? loss_fn : make_loss(loss_fn)
 
         if model.is_multiclass
             train_logits = _predict_raw(model, train_pool)

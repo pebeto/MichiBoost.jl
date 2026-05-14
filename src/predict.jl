@@ -53,7 +53,11 @@ function predict(model::MichiBoostModel, pool::Pool)
         for t in 1:nt
             preds .+= partials[t]
         end
-        return _softmax_matrix(preds)
+        return if model.custom_loss !== nothing
+            link_inverse(model.custom_loss, preds)
+        else
+            _softmax_matrix(preds)
+        end
     else
         partials = [zeros(Float64, n) for _ in 1:nt]
         leaf_bufs = [Vector{Int}(undef, n) for _ in 1:nt]
@@ -75,6 +79,9 @@ function predict(model::MichiBoostModel, pool::Pool)
         preds = fill(model.initial_pred::Float64, n)
         for t in 1:nt
             preds .+= partials[t]
+        end
+        if model.custom_loss !== nothing
+            return link_inverse(model.custom_loss, preds)
         end
         return model.n_classes == 2 ? _sigmoid.(preds) : preds
     end

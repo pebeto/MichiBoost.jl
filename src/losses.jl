@@ -1,5 +1,29 @@
 @inline _sigmoid(x::Real) = one(x) / (one(x) + exp(-x))
 
+# Public traits for custom losses
+#
+# `task_type(loss)` decides how the engine routes a custom loss:
+#   :regression  → vector pred / vector y, no class encoding (default)
+#   :binary      → label-to-Float64 mapping, vector pred / vector y
+#   :multiclass  → one-hot y, matrix pred, matrix g/h/scratch
+#
+# `link_inverse(loss, raw)` is applied at prediction time to turn raw boosted
+# scores into probabilities. Identity by default; sigmoid for binary builtins;
+# row-wise softmax for multiclass builtins. Custom binary losses should make
+# this return probabilities in [0,1] so that `predict_classes` can threshold
+# at 0.5.
+
+task_type(::LossFunction) = :regression
+link_inverse(::LossFunction, raw) = raw
+
+task_type(::RMSELoss) = :regression
+task_type(::MAELoss) = :regression
+task_type(::LoglossLoss) = :binary
+task_type(::MultiClassLoss) = :multiclass
+
+link_inverse(::LoglossLoss, raw::AbstractVector) = _sigmoid.(raw)
+link_inverse(::MultiClassLoss, raw::AbstractMatrix) = _softmax_matrix(raw)
+
 function _softmax(logits::AbstractVector)
     m = maximum(logits)
     e = exp.(logits .- m)
@@ -97,7 +121,7 @@ function gradient_hessian!(
     pred::AbstractVector,
     _scratch,
 )
-    @. g = y - pred
+    g .= y .- pred
     fill!(h, 1.0)
     return nothing
 end
@@ -110,7 +134,7 @@ function gradient_hessian!(
     pred::AbstractVector,
     _scratch,
 )
-    @. g = sign(y - pred)
+    g .= sign.(y .- pred)
     fill!(h, 1.0)
     return nothing
 end
@@ -123,9 +147,9 @@ function gradient_hessian!(
     pred::AbstractVector,
     scratch::AbstractVector,
 )
-    @. scratch = 1.0 / (1.0 + exp(-pred))
-    @. g = y - scratch
-    @. h = scratch * (1.0 - scratch)
+    scratch .= 1.0 ./ (1.0 .+ exp.(.-pred))
+    g .= y .- scratch
+    h .= scratch .* (1.0 .- scratch)
     return nothing
 end
 
@@ -138,8 +162,8 @@ function gradient_hessian!(
     scratch::AbstractMatrix,
 )
     _softmax_matrix!(scratch, pred)
-    @. g = y_onehot - scratch
-    @. h = scratch * (1.0 - scratch)
+    g .= y_onehot .- scratch
+    h .= scratch .* (1.0 .- scratch)
     return nothing
 end
 

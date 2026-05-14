@@ -22,6 +22,7 @@ makedocs(;
             "guide/classification.md",
             "guide/categorical_features.md",
             "guide/hyperparameters.md",
+            "guide/custom_loss.md",
             "guide/advanced.md",
         ],
         "API Reference" => [
