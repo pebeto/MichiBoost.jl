@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Custom Loss Functions · MichiBoost.jl</title><meta name="title" content="Custom Loss Functions · MichiBoost.jl"/><meta property="og:title" content="Custom Loss Functions · MichiBoost.jl"/><meta property="twitter:title" content="Custom Loss Functions · MichiBoost.jl"/><meta name="description" content="Documentation for MichiBoost.jl."/><meta property="og:description" content="Documentation for MichiBoost.jl."/><meta property="twitter:description" content="Documentation for MichiBoost.jl."/><meta property="og:url" content="https://pebeto.github.io/MichiBoost.jl/guide/custom_loss/"/><meta property="twitter:url" content="https://pebeto.github.io/MichiBoost.jl/guide/custom_loss/"/><link rel="canonical" href="https://pebeto.github.io/MichiBoost.jl/guide/custom_loss/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MichiBoost.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../getting_started/">Getting Started</a></li><li><span class="tocitem">User Guide</span><ul><li><a class="tocitem" href="../regression/">Regression</a></li><li><a class="tocitem" href="../classification/">Classification</a></li><li><a class="tocitem" href="../categorical_features/">Categorical Features</a></li><li><a class="tocitem" href="../hyperparameters/">Hyperparameters</a></li><li class="is-active"><a class="tocitem" href>Custom Loss Functions</a><ul class="internal"><li><a class="tocitem" href="#The-contract"><span>The contract</span></a></li><li><a class="tocitem" href="#Example:-Huber-loss-(regression)"><span>Example: Huber loss (regression)</span></a></li><li><a class="tocitem" href="#Example:-custom-binary-loss"><span>Example: custom binary loss</span></a></li><li><a class="tocitem" href="#Example:-custom-multi-class-loss"><span>Example: custom multi-class loss</span></a></li><li><a class="tocitem" href="#Save-/-load"><span>Save / load</span></a></li></ul></li><li><a class="tocitem" href="../advanced/">Advanced Features</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../api/models/">Models</a></li><li><a class="tocitem" href="../../api/data/">Data Structures</a></li><li><a class="tocitem" href="../../api/training/">Training</a></li><li><a class="tocitem" href="../../api/prediction/">Prediction</a></li><li><a class="tocitem" href="../../api/utilities/">Utilities</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">User Guide</a></li><li class="is-active"><a href>Custom Loss Functions</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Custom Loss Functions</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/pebeto/MichiBoost.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Custom-Loss-Functions"><a class="docs-heading-anchor" href="#Custom-Loss-Functions">Custom Loss Functions</a><a id="Custom-Loss-Functions-1"></a><a class="docs-heading-anchor-permalink" href="#Custom-Loss-Functions" title="Permalink"></a></h1><p>MichiBoost.jl ships with the standard losses (<code>Losses.RMSE</code>, <code>Losses.MAE</code>, <code>Losses.Logloss</code>, <code>Losses.MultiClass</code>), but you can plug in any loss by subtyping <a href="../../api/models/#MichiBoost.LossFunction"><code>LossFunction</code></a>. Custom losses are supported for all three tasks: regression, binary classification, and multi-class classification.</p><h2 id="The-contract"><a class="docs-heading-anchor" href="#The-contract">The contract</a><a id="The-contract-1"></a><a class="docs-heading-anchor-permalink" href="#The-contract" title="Permalink"></a></h2><p>Subtype <a href="../../api/models/#MichiBoost.LossFunction"><code>LossFunction</code></a> and implement these methods. Two of them are optional traits with sensible defaults; three are required.</p><h3 id="Required"><a class="docs-heading-anchor" href="#Required">Required</a><a id="Required-1"></a><a class="docs-heading-anchor-permalink" href="#Required" title="Permalink"></a></h3><table><tr><th style="text-align: right">Method</th><th style="text-align: right">Purpose</th></tr><tr><td style="text-align: right"><code>gradient_hessian!(g, h, lf, y, pred, scratch)</code></td><td style="text-align: right">Fused, in-place gradient + hessian. Writes both <code>g</code> and <code>h</code>.</td></tr><tr><td style="text-align: right"><code>initial_prediction(lf, y)</code></td><td style="text-align: right">Starting boosting prediction. Scalar for regression / binary, <code>Vector{Float64}</code> of length <code>n_classes</code> for multi-class.</td></tr><tr><td style="text-align: right"><code>loss(lf, y, pred)</code></td><td style="text-align: right">Scalar training loss; used for the verbose log and as the default early-stopping signal.</td></tr></table><h3 id="Optional-traits"><a class="docs-heading-anchor" href="#Optional-traits">Optional traits</a><a id="Optional-traits-1"></a><a class="docs-heading-anchor-permalink" href="#Optional-traits" title="Permalink"></a></h3><table><tr><th style="text-align: right">Trait</th><th style="text-align: right">Default</th><th style="text-align: right">When to override</th></tr><tr><td style="text-align: right"><code>task_type(lf)</code></td><td style="text-align: right"><code>:regression</code></td><td style="text-align: right">Return <code>:binary</code> or <code>:multiclass</code> to declare the task. Drives label encoding and pred-tensor shape.</td></tr><tr><td style="text-align: right"><code>link_inverse(lf, raw)</code></td><td style="text-align: right">identity</td><td style="text-align: right">Applied at prediction time to turn raw boosted scores into probabilities. Sigmoid for binary, row-wise softmax for multi-class. Used by <code>predict_proba</code> and <code>predict_classes</code>. For <code>:binary</code>, must return values in <code>[0, 1]</code> — <code>predict_classes</code> thresholds at 0.5.</td></tr></table><p>The wrapper validates that <code>task_type</code> matches the wrapper kind: <code>:regression</code> requires <a href="../../api/models/#MichiBoost.MichiBoostRegressor"><code>MichiBoostRegressor</code></a>; <code>:binary</code> and <code>:multiclass</code> require <a href="../../api/models/#MichiBoost.MichiBoostClassifier"><code>MichiBoostClassifier</code></a>.</p><h3 id="Buffer-shapes"><a class="docs-heading-anchor" href="#Buffer-shapes">Buffer shapes</a><a id="Buffer-shapes-1"></a><a class="docs-heading-anchor-permalink" href="#Buffer-shapes" title="Permalink"></a></h3><p>The engine pre-allocates <code>g</code>, <code>h</code>, and <code>scratch</code> and reuses them across iterations — your <code>gradient_hessian!</code> should be allocation-free in the hot path.</p><table><tr><th style="text-align: right"><code>task_type</code></th><th style="text-align: right"><code>g</code>, <code>h</code>, <code>pred</code>, <code>scratch</code></th><th style="text-align: right"><code>y</code></th></tr><tr><td style="text-align: right"><code>:regression</code></td><td style="text-align: right"><code>Vector{Float64}</code> of length <code>n_samples</code></td><td style="text-align: right"><code>Vector{Float64}</code></td></tr><tr><td style="text-align: right"><code>:binary</code></td><td style="text-align: right"><code>Vector{Float64}</code> of length <code>n_samples</code></td><td style="text-align: right"><code>Vector{Float64}</code> (<code>{0.0, 1.0}</code>-encoded)</td></tr><tr><td style="text-align: right"><code>:multiclass</code></td><td style="text-align: right"><code>Matrix{Float64}</code> of shape <code>(n_samples, n_classes)</code></td><td style="text-align: right">one-hot <code>Matrix{Float64}</code></td></tr></table><h2 id="Example:-Huber-loss-(regression)"><a class="docs-heading-anchor" href="#Example:-Huber-loss-(regression)">Example: Huber loss (regression)</a><a id="Example:-Huber-loss-(regression)-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-Huber-loss-(regression)" title="Permalink"></a></h2><pre><code class="language-julia hljs">using MichiBoost
+using MichiBoost: LossFunction
+using Statistics
+import MichiBoost: gradient_hessian!, initial_prediction, loss
+
+struct HuberLoss &lt;: LossFunction
+    delta::Float64
+end
+
+function gradient_hessian!(g, h, lf::HuberLoss, y, pred, _scratch)
+    δ = lf.delta
+    @inbounds for i in eachindex(y)
+        r = y[i] - pred[i]
+        if abs(r) &lt;= δ
+            g[i] = r
+            h[i] = 1.0
+        else
+            g[i] = δ * sign(r)
+            h[i] = 0.0
+        end
+    end
+    return nothing
+end
+
+initial_prediction(::HuberLoss, y) = median(y)
+
+function loss(lf::HuberLoss, y, pred)
+    δ = lf.delta
+    s = 0.0
+    @inbounds for i in eachindex(y)
+        r = y[i] - pred[i]
+        s += abs(r) &lt;= δ ? 0.5 * r^2 : δ * (abs(r) - 0.5 * δ)
+    end
+    return s / length(y)
+end
+
+model = MichiBoostRegressor(; iterations=100, depth=4, loss_function=HuberLoss(1.0))
+fit!(model, X_train, y_train)
+ŷ = predict(model, X_test)</code></pre><h2 id="Example:-custom-binary-loss"><a class="docs-heading-anchor" href="#Example:-custom-binary-loss">Example: custom binary loss</a><a id="Example:-custom-binary-loss-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-custom-binary-loss" title="Permalink"></a></h2><pre><code class="language-julia hljs">using MichiBoost
+using MichiBoost: LossFunction
+using Statistics
+import MichiBoost: gradient_hessian!, initial_prediction, loss
+import MichiBoost: task_type, link_inverse
+
+struct MyLogloss &lt;: LossFunction end
+task_type(::MyLogloss) = :binary
+
+@inline _sig(x) = 1.0 / (1.0 + exp(-x))
+link_inverse(::MyLogloss, raw::AbstractVector) = _sig.(raw)
+
+function gradient_hessian!(g, h, ::MyLogloss, y, pred, scratch)
+    scratch .= _sig.(pred)
+    g .= y .- scratch
+    h .= scratch .* (1.0 .- scratch)
+    return nothing
+end
+
+function initial_prediction(::MyLogloss, y)
+    p = clamp(mean(y), 1e-7, 1.0 - 1e-7)
+    return log(p / (1.0 - p))
+end
+
+function loss(::MyLogloss, y, pred)
+    p = clamp.(_sig.(pred), 1e-15, 1.0 - 1e-15)
+    return -mean(y .* log.(p) .+ (1.0 .- y) .* log.(1.0 .- p))
+end
+
+clf = MichiBoostClassifier(; iterations=100, depth=4, loss_function=MyLogloss())
+fit!(clf, X_train, y_train)
+predict_proba(clf, X_test)</code></pre><h2 id="Example:-custom-multi-class-loss"><a class="docs-heading-anchor" href="#Example:-custom-multi-class-loss">Example: custom multi-class loss</a><a id="Example:-custom-multi-class-loss-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-custom-multi-class-loss" title="Permalink"></a></h2><p>For multi-class, <code>g</code>, <code>h</code>, <code>pred</code>, and <code>scratch</code> are matrices and <code>y</code> arrives as a one-hot <code>Matrix{Float64}</code>.</p><pre><code class="language-julia hljs">struct MyMultiClass &lt;: LossFunction end
+task_type(::MyMultiClass) = :multiclass
+
+function _row_softmax!(out, raw)
+    for i in axes(raw, 1)
+        m = maximum(view(raw, i, :))
+        s = 0.0
+        for j in axes(raw, 2)
+            e = exp(raw[i, j] - m); out[i, j] = e; s += e
+        end
+        for j in axes(raw, 2); out[i, j] /= s; end
+    end
+    return out
+end
+
+link_inverse(::MyMultiClass, raw::AbstractMatrix) = _row_softmax!(similar(raw), raw)
+
+function gradient_hessian!(g, h, ::MyMultiClass, y_onehot, pred, scratch)
+    _row_softmax!(scratch, pred)
+    g .= y_onehot .- scratch
+    h .= scratch .* (1.0 .- scratch)
+    return nothing
+end
+
+function initial_prediction(::MyMultiClass, y_onehot)
+    class_probs = clamp.(vec(mean(y_onehot; dims=1)), 1e-7, 1.0 - 1e-7)
+    return log.(class_probs)
+end
+
+function loss(::MyMultiClass, y_onehot, pred)
+    probs = clamp.(_row_softmax!(similar(pred), pred), 1e-15, 1.0)
+    return -mean(sum(y_onehot .* log.(probs); dims=2))
+end
+
+clf = MichiBoostClassifier(; iterations=100, depth=4, loss_function=MyMultiClass())
+fit!(clf, X_train, y_train)
+predict_proba(clf, X_test)</code></pre><h2 id="Save-/-load"><a class="docs-heading-anchor" href="#Save-/-load">Save / load</a><a id="Save-/-load-1"></a><a class="docs-heading-anchor-permalink" href="#Save-/-load" title="Permalink"></a></h2><p>Models trained with a custom loss round-trip through <a href="../../api/utilities/#MichiBoost.save_model"><code>save_model</code></a> and <a href="../../api/utilities/#MichiBoost.load_model"><code>load_model</code></a>. The loss&#39;s type definition must be in scope when calling <a href="../../api/utilities/#MichiBoost.load_model"><code>load_model</code></a> — load the package or <code>include</code> the file that defines your loss before deserializing, otherwise JLD2 cannot reconstruct the instance.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../hyperparameters/">« Hyperparameters</a><a class="docs-footer-nextpage" href="../advanced/">Advanced Features »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 14 May 2026 04:36">Thursday 14 May 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
