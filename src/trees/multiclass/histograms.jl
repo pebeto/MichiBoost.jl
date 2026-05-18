@@ -19,23 +19,26 @@ function _fill_num_leaf_mc!(
     num_bins,
     n_classes::Int,
 )
-    @inbounds for c in 1:n_classes
-        total_g[c, li] = 0.0
-        total_h[c, li] = 0.0
-    end
     n = length(group)
     @inbounds for i in 1:n
         idx = group[i]
         b = Int(num_bins[idx, j]) + 1
         hist_c[li, b] += 1
         for c in 1:n_classes
-            gv = gradients[idx, c]
-            hv = hessians[idx, c]
-            hist_g[c, li, b] += gv
-            hist_h[c, li, b] += hv
-            total_g[c, li] += gv
-            total_h[c, li] += hv
+            hist_g[c, li, b] += gradients[idx, c]
+            hist_h[c, li, b] += hessians[idx, c]
         end
+    end
+    nb1 = size(hist_g, 3)
+    @inbounds for c in 1:n_classes
+        sg = 0.0
+        sh = 0.0
+        for b in 1:nb1
+            sg += hist_g[c, li, b]
+            sh += hist_h[c, li, b]
+        end
+        total_g[c, li] = sg
+        total_h[c, li] = sh
     end
     return n
 end
@@ -55,23 +58,26 @@ function _fill_cat_leaf_mc!(
     sorted_vals,
     n_classes::Int,
 )
-    @inbounds for c in 1:n_classes
-        total_g[c, li] = 0.0
-        total_h[c, li] = 0.0
-    end
     n = length(group)
     @inbounds for i in 1:n
         idx = group[i]
         b = searchsortedfirst(sorted_vals, cat_encoded[idx, j])
         hist_c[li, b] += 1
         for c in 1:n_classes
-            gv = gradients[idx, c]
-            hv = hessians[idx, c]
-            hist_g[c, li, b] += gv
-            hist_h[c, li, b] += hv
-            total_g[c, li] += gv
-            total_h[c, li] += hv
+            hist_g[c, li, b] += gradients[idx, c]
+            hist_h[c, li, b] += hessians[idx, c]
         end
+    end
+    nv = size(hist_g, 3)
+    @inbounds for c in 1:n_classes
+        sg = 0.0
+        sh = 0.0
+        for b in 1:nv
+            sg += hist_g[c, li, b]
+            sh += hist_h[c, li, b]
+        end
+        total_g[c, li] = sg
+        total_h[c, li] = sh
     end
     return n
 end
