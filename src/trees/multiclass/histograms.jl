@@ -17,7 +17,6 @@ function _fill_num_leaf_mc!(
     gradients,
     hessians,
     num_bins,
-    buf,
     n_classes::Int,
 )
     @inbounds for c in 1:n_classes
@@ -54,7 +53,6 @@ function _fill_cat_leaf_mc!(
     hessians,
     cat_encoded,
     sorted_vals,
-    buf,
     n_classes::Int,
 )
     @inbounds for c in 1:n_classes
@@ -149,7 +147,6 @@ function _fill_num_hist_mc!(
                 gradients,
                 hessians,
                 num_bins,
-                buf,
                 n_classes,
             )
 
@@ -200,7 +197,6 @@ function _fill_num_hist_mc!(
                 gradients,
                 hessians,
                 num_bins,
-                buf,
                 n_classes,
             )
             total_n[li] = n
@@ -281,7 +277,6 @@ function _fill_cat_hist_mc!(
                 hessians,
                 cat_encoded,
                 sorted_vals,
-                buf,
                 n_classes,
             )
 
@@ -333,7 +328,6 @@ function _fill_cat_hist_mc!(
                 hessians,
                 cat_encoded,
                 sorted_vals,
-                buf,
                 n_classes,
             )
             total_n[li] = n
@@ -485,102 +479,61 @@ function _find_best_split_across_leaves_mc(
         end
     end
 
+    # See base/histograms.jl for the rationale: empty `cat_sorted_vals` means
+    # per-feature on-the-fly cut points, which disables the subtraction trick
+    # and the parent-validity cache.
+    cat_no_precomputed = isempty(cat_sorted_vals)
     Threads.@threads :dynamic for j in sampled_cat
-        if isempty(cat_sorted_vals)
-            sorted_vals_local = _collect_cat_vals(leaf_groups, cat_encoded, j)
-            nv = length(sorted_vals_local)
-            nv <= 1 && continue
-            tid = Threads.threadid()
-            buf = bufs[tid]
-            hist_g = cache.cat_hist_g[j]
-            hist_h = cache.cat_hist_h[j]
-            hist_c = cache.cat_hist_c[j]
-            _fill_cat_hist_mc!(
-                buf,
-                hist_g,
-                hist_h,
-                hist_c,
-                leaf_groups,
-                j,
-                gradients,
-                hessians,
-                cat_encoded,
-                sorted_vals_local,
-                nv,
-                n_classes,
-                false,
-                n_samples_level,
-            )
-            cache.cat_hist_filled[j] = false
-            gain, b = _sweep_gain_mc(
-                hist_g,
-                hist_h,
-                hist_c,
-                buf.total_g,
-                buf.total_h,
-                buf.total_n,
-                buf.left_g,
-                buf.left_h,
-                buf.left_c,
-                buf.total_score,
-                n_leaves,
-                nv,
-                l2_leaf_reg,
-                min_data_in_leaf,
-                n_classes,
-            )
-            if gain > thread_bests[tid].gain && b > 0
-                threshold = (sorted_vals_local[b - 1] + sorted_vals_local[b]) / 2.0
-                thread_bests[tid] = SplitCandidate(j, true, threshold, gain)
-            end
+        sorted_vals = if cat_no_precomputed
+            _collect_cat_vals(leaf_groups, cat_encoded, j)
         else
-            sorted_vals = cat_sorted_vals[j]
-            nv = length(sorted_vals)
-            nv <= 1 && continue
-            tid = Threads.threadid()
-            buf = bufs[tid]
-            hist_g = cache.cat_hist_g[j]
-            hist_h = cache.cat_hist_h[j]
-            hist_c = cache.cat_hist_c[j]
-            has_parent = cache.cat_hist_valid[j]
-            _fill_cat_hist_mc!(
-                buf,
-                hist_g,
-                hist_h,
-                hist_c,
-                leaf_groups,
-                j,
-                gradients,
-                hessians,
-                cat_encoded,
-                sorted_vals,
-                nv,
-                n_classes,
-                has_parent,
-                n_samples_level,
-            )
-            cache.cat_hist_filled[j] = true
-            gain, b = _sweep_gain_mc(
-                hist_g,
-                hist_h,
-                hist_c,
-                buf.total_g,
-                buf.total_h,
-                buf.total_n,
-                buf.left_g,
-                buf.left_h,
-                buf.left_c,
-                buf.total_score,
-                n_leaves,
-                nv,
-                l2_leaf_reg,
-                min_data_in_leaf,
-                n_classes,
-            )
-            if gain > thread_bests[tid].gain && b > 0
-                threshold = (sorted_vals[b - 1] + sorted_vals[b]) / 2.0
-                thread_bests[tid] = SplitCandidate(j, true, threshold, gain)
-            end
+            cat_sorted_vals[j]
+        end
+        nv = length(sorted_vals)
+        nv <= 1 && continue
+        tid = Threads.threadid()
+        buf = bufs[tid]
+        hist_g = cache.cat_hist_g[j]
+        hist_h = cache.cat_hist_h[j]
+        hist_c = cache.cat_hist_c[j]
+        has_parent = cat_no_precomputed ? false : cache.cat_hist_valid[j]
+        _fill_cat_hist_mc!(
+            buf,
+            hist_g,
+            hist_h,
+            hist_c,
+            leaf_groups,
+            j,
+            gradients,
+            hessians,
+            cat_encoded,
+            sorted_vals,
+            nv,
+            n_classes,
+            has_parent,
+            n_samples_level,
+        )
+        cache.cat_hist_filled[j] = !cat_no_precomputed
+        gain, b = _sweep_gain_mc(
+            hist_g,
+            hist_h,
+            hist_c,
+            buf.total_g,
+            buf.total_h,
+            buf.total_n,
+            buf.left_g,
+            buf.left_h,
+            buf.left_c,
+            buf.total_score,
+            n_leaves,
+            nv,
+            l2_leaf_reg,
+            min_data_in_leaf,
+            n_classes,
+        )
+        if gain > thread_bests[tid].gain && b > 0
+            threshold = (sorted_vals[b - 1] + sorted_vals[b]) / 2.0
+            thread_bests[tid] = SplitCandidate(j, true, threshold, gain)
         end
     end
 

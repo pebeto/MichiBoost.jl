@@ -25,62 +25,15 @@ function train(
 
     qf = quantize_features(pool.features_numerical; border_count)
 
-    # Custom LossFunction instances declare their task via `task_type`; built-in
-    # string names route through the original switch.
-    is_custom_loss = loss_function isa LossFunction
-    custom_task = is_custom_loss ? task_type(loss_function) : nothing
-    is_classification = if is_custom_loss
-        custom_task === :binary || custom_task === :multiclass
-    else
-        uppercase(loss_function) in ("LOGLOSS", "CROSSENTROPY", "MULTICLASS", "MULTILOGLOSS")
-    end
-    is_multiclass = if is_custom_loss
-        custom_task === :multiclass
-    else
-        uppercase(loss_function) in ("MULTICLASS", "MULTILOGLOSS")
-    end
-
-    class_labels = Float64[]
-    y = copy(label)
-    original_class_labels = pool.label_classes
-
-    if is_classification && !is_multiclass
-        class_labels = sort(unique(label))
-        n_classes = length(class_labels)
-        if n_classes > 2
-            is_custom_loss && error(
-                "Custom binary `LossFunction` was given but training labels have " *
-                "$n_classes unique values; declare `task_type(::MyLoss) = :multiclass` " *
-                "and implement the matrix-shaped contract instead.",
-            )
-            is_multiclass = true
-            loss_function = "MultiClass"
-        else
-            label_map = Dict(
-                class_labels[i] => Float64(i - 1) for i in eachindex(class_labels)
-            )
-            y = [label_map[v] for v in label]
-        end
-    end
-
-    if is_multiclass
-        class_labels = sort(unique(label))
-        n_classes = length(class_labels)
-        label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
-        y_indices = [label_map[v] for v in label]
-        y_onehot = zeros(Float64, n_samples, n_classes)
-        for i in 1:n_samples
-            y_onehot[i, y_indices[i]] = 1.0
-        end
-    else
-        n_classes = is_classification ? 2 : 0
-    end
-
-    class_labels_final = if original_class_labels !== nothing
-        original_class_labels
-    else
-        class_labels
-    end
+    task = _resolve_task(loss_function, label, pool.label_classes, n_samples)
+    loss_function = task.loss_function
+    is_custom_loss = task.is_custom_loss
+    is_classification = task.is_classification
+    is_multiclass = task.is_multiclass
+    n_classes = task.n_classes
+    y = task.y
+    y_onehot = task.y_onehot
+    class_labels_final = task.class_labels_final
 
     # Categorical encoding
     permutation = randperm(rng, n_samples)
@@ -99,7 +52,11 @@ function train(
 
     lf = is_custom_loss ? loss_function : make_loss(loss_function; n_classes)
 
-    # Initial predictions
+    # Initial predictions. Both `initial_pred` (multiclass vector) and
+    # `initial_pred_val` (binary/regression scalar) are bound so `_setup_eval`
+    # can take both as arguments without UndefVarError on the unused branch.
+    initial_pred = Float64[]
+    initial_pred_val = 0.0
     if is_multiclass
         initial_pred = initial_prediction(lf, y_onehot)
         predictions = repeat(initial_pred', n_samples, 1)
@@ -150,65 +107,31 @@ function train(
 
     leaf_indices = Vector{Int}(undef, n_samples)
 
-    # Early-stopping eval state — set up once, updated incrementally each
-    # round so the ES check is O(1) per iteration instead of O(T).  The
-    # original _evaluate_loss re-predicted all trees on every call, which
-    # made ES O(T²) across a run.
+    # Early-stopping eval state — built once, updated incrementally each round
+    # so the ES check is O(1) per iteration instead of O(T). `_setup_eval`
+    # returns the same NamedTuple shape in both the active and inactive cases
+    # (empty matrices when inactive) so the loop can read `eval_state.*`
+    # without nullability checks.
     es_active = early_stopping_rounds !== nothing && eval_pool !== nothing
-    eval_num_bins = Matrix{UInt16}(undef, 0, 0)
-    eval_cat_enc = Matrix{Float64}(undef, 0, 0)
-    eval_preds_vec = Float64[]
-    eval_preds_mat = Matrix{Float64}(undef, 0, 0)
-    eval_y_vec = Float64[]
-    eval_y_onehot = Matrix{Float64}(undef, 0, 0)
-    eval_leaf_indices = Int[]
-    if es_active
-        n_eval = eval_pool.n_samples
-        eval_num_bins = if n_numerical(eval_pool) > 0
-            apply_borders(eval_pool.features_numerical, qf.borders)
-        else
-            Matrix{UInt16}(undef, n_eval, 0)
-        end
-        eval_cat_enc = if n_categorical(eval_pool) > 0 && encoder !== nothing
-            encode_categorical(encoder, eval_pool.features_categorical)
-        else
-            Matrix{Float64}(undef, n_eval, 0)
-        end
-        eval_leaf_indices = Vector{Int}(undef, n_eval)
-        eval_y_raw = get_label(eval_pool)
-        if is_multiclass
-            eval_preds_mat = repeat(initial_pred', n_eval, 1)
-            es_class_labels = sort(unique(eval_y_raw))
-            es_label_map = Dict(es_class_labels[i] => i for i in eachindex(es_class_labels))
-            eval_y_onehot = zeros(Float64, n_eval, n_classes)
-            for i in 1:n_eval
-                eval_y_onehot[i, es_label_map[eval_y_raw[i]]] = 1.0
-            end
-        else
-            eval_preds_vec = fill(initial_pred_val, n_eval)
-            eval_y_vec = eval_y_raw
-        end
-    end
+    eval_state = _setup_eval(
+        es_active,
+        eval_pool,
+        qf.borders,
+        encoder,
+        is_multiclass,
+        n_classes,
+        initial_pred,
+        initial_pred_val,
+    )
 
     # Buffers reused across every boosting round — without this the loop
     # allocates an O(n × n_classes) matrix (or O(n) vector) 4-6 times per
     # iteration for gradient / hessian / softmax temporaries, which on
     # n=40k × k=7 adds up to ~100 MB / iter.
-    grads_buf = if is_multiclass
-        Matrix{Float64}(undef, n_samples, n_classes)
-    else
-        Vector{Float64}(undef, n_samples)
-    end
-    hess_buf = if is_multiclass
-        Matrix{Float64}(undef, n_samples, n_classes)
-    else
-        Vector{Float64}(undef, n_samples)
-    end
-    scratch_buf = if is_multiclass
-        Matrix{Float64}(undef, n_samples, n_classes)
-    else
-        Vector{Float64}(undef, n_samples)
-    end
+    bufs = _alloc_grad_buffers(is_multiclass, n_samples, n_classes)
+    grads_buf = bufs.g
+    hess_buf = bufs.h
+    scratch_buf = bufs.scratch
     use_refine = lf isa MAELoss
     refine_buf = use_refine ? Vector{Float64}(undef, n_samples) : Float64[]
 
@@ -294,24 +217,24 @@ function train(
             # so we only pay O(1) tree-prediction per ES check.
             eval_value = if is_multiclass
                 predict_tree!(
-                    eval_preds_mat,
+                    eval_state.preds_mat,
                     tree,
-                    eval_num_bins,
-                    eval_cat_enc,
+                    eval_state.num_bins,
+                    eval_state.cat_enc,
                     learning_rate,
-                    eval_leaf_indices,
+                    eval_state.leaf_indices,
                 )
-                es_metric_fn(eval_y_onehot, eval_preds_mat)
+                es_metric_fn(eval_state.y_onehot, eval_state.preds_mat)
             else
                 predict_tree!(
-                    eval_preds_vec,
+                    eval_state.preds_vec,
                     tree,
-                    eval_num_bins,
-                    eval_cat_enc,
+                    eval_state.num_bins,
+                    eval_state.cat_enc,
                     learning_rate,
-                    eval_leaf_indices,
+                    eval_state.leaf_indices,
                 )
-                es_metric_fn(eval_y_vec, eval_preds_vec)
+                es_metric_fn(eval_state.y_vec, eval_state.preds_vec)
             end
             improved = if es_orientation == :minimize
                 eval_value < best_eval_value
@@ -354,4 +277,165 @@ function train(
         final_best_score,
         is_custom_loss ? loss_function : nothing,
     )
+end
+
+# Helpers extracted from `train` for readability. Pure functions, no shared
+# state with the caller — return NamedTuples so the caller can read fields
+# directly without nullability checks.
+# Decide the task (regression / binary / multiclass), encode labels, and build
+# the one-hot target matrix for multiclass. Mirrors what was previously inlined
+# at the top of `train` — including the auto-promotion from binary string-loss
+# to "MultiClass" when the training labels have > 2 unique values, and the
+# error path for a custom `:binary` loss meeting that same data.
+function _resolve_task(loss_function, label, original_class_labels, n_samples::Int)
+    is_custom_loss = loss_function isa LossFunction
+    custom_task = is_custom_loss ? task_type(loss_function) : nothing
+    is_classification = if is_custom_loss
+        custom_task === :binary || custom_task === :multiclass
+    else
+        uppercase(loss_function) in ("LOGLOSS", "CROSSENTROPY", "MULTICLASS", "MULTILOGLOSS")
+    end
+    is_multiclass = if is_custom_loss
+        custom_task === :multiclass
+    else
+        uppercase(loss_function) in ("MULTICLASS", "MULTILOGLOSS")
+    end
+
+    class_labels = Float64[]
+    y = copy(label)
+
+    if is_classification && !is_multiclass
+        class_labels = sort(unique(label))
+        nc = length(class_labels)
+        if nc > 2
+            is_custom_loss && error(
+                "Custom binary `LossFunction` was given but training labels have " *
+                "$nc unique values; declare `task_type(::MyLoss) = :multiclass` " *
+                "and implement the matrix-shaped contract instead.",
+            )
+            is_multiclass = true
+            loss_function = "MultiClass"
+        else
+            label_map = Dict(
+                class_labels[i] => Float64(i - 1) for i in eachindex(class_labels)
+            )
+            y = [label_map[v] for v in label]
+        end
+    end
+
+    y_onehot = Matrix{Float64}(undef, 0, 0)
+    n_classes = if is_multiclass
+        class_labels = sort(unique(label))
+        nc = length(class_labels)
+        label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
+        y_onehot = zeros(Float64, n_samples, nc)
+        @inbounds for i in 1:n_samples
+            y_onehot[i, label_map[label[i]]] = 1.0
+        end
+        nc
+    else
+        is_classification ? 2 : 0
+    end
+
+    class_labels_final =
+        original_class_labels !== nothing ? original_class_labels : class_labels
+
+    return (;
+        loss_function,
+        is_custom_loss,
+        is_classification,
+        is_multiclass,
+        n_classes,
+        y,
+        y_onehot,
+        class_labels_final,
+    )
+end
+
+# Allocate the per-iteration gradient / hessian / scratch buffers. Multiclass
+# variants are matrices `(n_samples, n_classes)`; the rest are vectors.
+function _alloc_grad_buffers(is_multiclass::Bool, n_samples::Int, n_classes::Int)
+    if is_multiclass
+        return (
+            g=Matrix{Float64}(undef, n_samples, n_classes),
+            h=Matrix{Float64}(undef, n_samples, n_classes),
+            scratch=Matrix{Float64}(undef, n_samples, n_classes),
+        )
+    else
+        return (
+            g=Vector{Float64}(undef, n_samples),
+            h=Vector{Float64}(undef, n_samples),
+            scratch=Vector{Float64}(undef, n_samples),
+        )
+    end
+end
+
+# Build the eval-pool state used by early stopping. Returns the same NamedTuple
+# shape in both cases (empty matrices when inactive) so the boosting loop can
+# read `eval_state.*` without nullability handling.
+function _setup_eval(
+    es_active::Bool,
+    eval_pool,
+    borders,
+    encoder,
+    is_multiclass::Bool,
+    n_classes::Int,
+    initial_pred::Vector{Float64},
+    initial_pred_val::Float64,
+)
+    if !es_active
+        return (
+            num_bins=Matrix{UInt16}(undef, 0, 0),
+            cat_enc=Matrix{Float64}(undef, 0, 0),
+            leaf_indices=Int[],
+            preds_vec=Float64[],
+            preds_mat=Matrix{Float64}(undef, 0, 0),
+            y_vec=Float64[],
+            y_onehot=Matrix{Float64}(undef, 0, 0),
+        )
+    end
+
+    n_eval = eval_pool.n_samples
+    num_bins = if n_numerical(eval_pool) > 0
+        apply_borders(eval_pool.features_numerical, borders)
+    else
+        Matrix{UInt16}(undef, n_eval, 0)
+    end
+    cat_enc = if n_categorical(eval_pool) > 0 && encoder !== nothing
+        encode_categorical(encoder, eval_pool.features_categorical)
+    else
+        Matrix{Float64}(undef, n_eval, 0)
+    end
+    leaf_indices = Vector{Int}(undef, n_eval)
+    y_raw = get_label(eval_pool)
+
+    if is_multiclass
+        preds_mat = repeat(initial_pred', n_eval, 1)
+        class_labels = sort(unique(y_raw))
+        label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
+        y_onehot = zeros(Float64, n_eval, n_classes)
+        @inbounds for i in 1:n_eval
+            y_onehot[i, label_map[y_raw[i]]] = 1.0
+        end
+        return (
+            num_bins=num_bins,
+            cat_enc=cat_enc,
+            leaf_indices=leaf_indices,
+            preds_vec=Float64[],
+            preds_mat=preds_mat,
+            y_vec=Float64[],
+            y_onehot=y_onehot,
+        )
+    else
+        preds_vec = fill(initial_pred_val, n_eval)
+        return (
+            num_bins=num_bins,
+            cat_enc=cat_enc,
+            leaf_indices=leaf_indices,
+            preds_vec=preds_vec,
+            preds_mat=Matrix{Float64}(undef, 0, 0),
+            y_vec=y_raw,
+            y_onehot=Matrix{Float64}(undef, 0, 0),
+        )
+    end
 end

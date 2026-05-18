@@ -214,7 +214,7 @@ Fixture: `n_train=1600`, `n_features=20`, default hyperparameters (100 iters, de
 | RSM: rsm=1.0 → rsm=0.5             |   44.1ms |  29.6ms | −33.0% |
 | Sample weights: none → uniform     |   45.2ms |  45.3ms |  +0.4% |
 
-Save/load: `save` 0.1ms, `load` 0.2ms (Julia `Serialization`).
+Save/load: `save` 2.1ms, `load` 0.9ms (JLD2).
 
 ## Caveats
 
