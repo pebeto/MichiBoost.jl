@@ -131,6 +131,20 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
         boosting_type=_to_string(
             get(p, :boosting_type, "Ordered"), BoostingType, _boosting_name, "boosting_type"
         ),
+        init_model=let v = get(p, :init_model, nothing)
+            if v === nothing
+                nothing
+            elseif v isa MichiBoostModel
+                v
+            elseif v isa MichiBoostWrapper
+                v.model
+            else
+                error(
+                    "`init_model` must be a `MichiBoostModel` or fitted wrapper, " *
+                    "got `$(typeof(v))`",
+                )
+            end
+        end,
     )
     return m
 end
@@ -387,7 +401,7 @@ function staged_predict(
 
     model = m.model
     if model.is_multiclass
-        n, k, niter = size(raw)
+        n, _, niter = size(raw)
         if pt == "Probability"
             out = similar(raw)
             @inbounds for it in 1:niter

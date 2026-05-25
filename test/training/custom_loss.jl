@@ -38,7 +38,7 @@ function gradient_hessian!(
     lf::HuberLoss,
     y::AbstractVector,
     pred::AbstractVector,
-    _scratch,
+    _,
 )
     δ = lf.delta
     @inbounds for i in eachindex(y)

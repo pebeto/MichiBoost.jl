@@ -179,3 +179,42 @@ predictions = predict(loaded, Pool(X_test))
 [`MichiBoostClassifier`](@ref)) or a raw [`MichiBoostModel`](@ref). [`load_model`](@ref)
 always returns a [`MichiBoostModel`](@ref), which takes a [`Pool`](@ref) as prediction
 input.
+
+## Continuing Training
+
+Pass a previously fitted model as `init_model` to resume training from it. The
+new fit inherits every tree of `init_model` and adds `iterations` more on top.
+
+```julia
+base = MichiBoostRegressor(; iterations=100, depth=6, learning_rate=0.03)
+fit!(base, X_train, y_train)
+
+continued = MichiBoostRegressor(; iterations=50, depth=6, learning_rate=0.03)
+fit!(continued, X_train, y_train; init_model=base)
+
+length(continued.model.trees) == 150
+```
+
+MichiBoost reuses `init_model`'s feature borders and (if present) categorical
+encoder. The `border_count` kwarg is ignored when `init_model` is set, since
+changing borders would invalidate every split in the inherited trees.
+
+Accepted forms for `init_model`:
+
+- a fitted [`MichiBoostRegressor`](@ref) or [`MichiBoostClassifier`](@ref) wrapper
+- a raw [`MichiBoostModel`](@ref)
+- `nothing` (the default; equivalent to a fresh fit)
+
+The task must match. A regressor only continues from a regressor, a classifier
+only from a classifier with the same `n_classes` and `is_multiclass`. Feature
+counts must also match. [`fit!`](@ref) errors at the start of training when
+these don't line up.
+
+`learning_rate` applies to every tree in the final model, inherited and new
+alike. Set it to the value `base` used. Picking a different `learning_rate`
+rescales the inherited trees' contribution, so `predict(continued, X)` will not
+match `predict(base, X)` even before any new trees fire.
+
+`early_stopping_rounds` works with `init_model`: the eval metric runs over the
+full ensemble after each new tree, and `best_iteration` counts from tree #1 of
+the inherited model, not from the first newly added tree.

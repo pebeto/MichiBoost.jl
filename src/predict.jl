@@ -90,12 +90,6 @@ function predict_classes(model::MichiBoostModel, pool::Pool)
 end
 
 function feature_importance(model::MichiBoostModel)
-    n_num = length(model.borders)
-    n_cat = if model.encoder !== nothing
-        length(model.encoder.category_stats)
-    else
-        0
-    end
     importance = Dict{Symbol,Float64}()
 
     for tree in model.trees, k in 1:(tree.depth)

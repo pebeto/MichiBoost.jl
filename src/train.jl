@@ -14,6 +14,7 @@ function train(
     eval_pool::Union{Pool,Nothing}=nothing,
     eval_metric::Union{Type{<:Metric},AbstractString,Symbol,Nothing}=nothing,
     boosting_type::Union{String,Symbol}="Ordered",
+    init_model::Union{MichiBoostModel,Nothing}=nothing,
     kwargs...,
 )
     # Normalise Symbol forms once at entry so the downstream `uppercase` / `==`
@@ -31,21 +32,63 @@ function train(
     n_num = n_numerical(pool)
     n_cat = n_categorical(pool)
 
-    qf = quantize_features(pool.features_numerical; border_count)
+    # When continuing from `init_model`, reuse its borders so the new bin
+    # indices align with the existing trees. Recomputing borders on the
+    # continuation pool would break every split in the inherited trees.
+    qf = if init_model !== nothing
+        length(init_model.borders) == n_num || error(
+            "`init_model` has $(length(init_model.borders)) numerical features but " *
+            "pool has $n_num.",
+        )
+        bins = if n_num > 0
+            apply_borders(pool.features_numerical, init_model.borders)
+        else
+            Matrix{UInt16}(undef, n_samples, 0)
+        end
+        n_bins_vec = [length(b) + 1 for b in init_model.borders]
+        QuantizedFeatures(bins, init_model.borders, n_bins_vec)
+    else
+        quantize_features(pool.features_numerical; border_count)
+    end
 
     task = _resolve_task(loss_function, label, pool.label_classes, n_samples)
     loss_function = task.loss_function
     is_custom_loss = task.is_custom_loss
-    is_classification = task.is_classification
     is_multiclass = task.is_multiclass
     n_classes = task.n_classes
     y = task.y
     y_onehot = task.y_onehot
     class_labels_final = task.class_labels_final
 
-    # Categorical encoding
+    if init_model !== nothing
+        init_model.is_multiclass == is_multiclass || error(
+            "`init_model.is_multiclass = $(init_model.is_multiclass)` does not match " *
+            "the current task ($(is_multiclass ? "multiclass" : "binary/regression")).",
+        )
+        init_model.n_classes == n_classes || error(
+            "`init_model.n_classes = $(init_model.n_classes)` does not match the " *
+            "current task ($n_classes).",
+        )
+    end
+
+    # Categorical encoding. Reuse init_model's encoder when continuing so the
+    # encoded values feeding into inherited trees match what those trees saw
+    # during their original training.
     permutation = randperm(rng, n_samples)
-    cat_encoded, encoder = if n_cat > 0
+    cat_encoded, encoder = if init_model !== nothing
+        if n_cat > 0
+            init_model.encoder !== nothing || error(
+                "`init_model` has no categorical encoder but the pool has $n_cat " *
+                "categorical features.",
+            )
+            (
+                encode_categorical(init_model.encoder, pool.features_categorical),
+                init_model.encoder,
+            )
+        else
+            (Matrix{Float64}(undef, n_samples, 0), init_model.encoder)
+        end
+    elseif n_cat > 0
         if boosting_type == "Ordered"
             compute_ordered_target_stats(pool.features_categorical, y, permutation; alpha=1.0)
         else
@@ -65,7 +108,16 @@ function train(
     # can take both as arguments without UndefVarError on the unused branch.
     initial_pred = Float64[]
     initial_pred_val = 0.0
-    if is_multiclass
+    if init_model !== nothing
+        if is_multiclass
+            initial_pred = init_model.initial_pred::Vector{Float64}
+        else
+            initial_pred_val = init_model.initial_pred::Float64
+        end
+        predictions = _predict_raw_for_init(
+            init_model, qf.bins, cat_encoded, learning_rate
+        )
+    elseif is_multiclass
         initial_pred = initial_prediction(lf, y_onehot)
         predictions = repeat(initial_pred', n_samples, 1)
     else
@@ -73,7 +125,15 @@ function train(
         predictions = fill(initial_pred_val, n_samples)
     end
 
-    trees = is_multiclass ? SymmetricTreeMultiClass[] : SymmetricTree[]
+    trees = if init_model !== nothing
+        if is_multiclass
+            copy(init_model.trees::Vector{SymmetricTreeMultiClass})
+        else
+            copy(init_model.trees::Vector{SymmetricTree})
+        end
+    else
+        is_multiclass ? SymmetricTreeMultiClass[] : SymmetricTree[]
+    end
 
     es_orientation, es_metric_fn = if eval_metric === nothing
         # Default: use the training loss for the eval signal (lower is better).
@@ -130,6 +190,8 @@ function train(
         n_classes,
         initial_pred,
         initial_pred_val,
+        init_model,
+        learning_rate,
     )
 
     # Buffers reused across every boosting round. Without this the loop
@@ -390,6 +452,8 @@ function _setup_eval(
     n_classes::Int,
     initial_pred::Vector{Float64},
     initial_pred_val::Float64,
+    init_model::Union{MichiBoostModel,Nothing},
+    learning_rate::Float64,
 )
     if !es_active
         return (
@@ -418,7 +482,11 @@ function _setup_eval(
     y_raw = get_label(eval_pool)
 
     if is_multiclass
-        preds_mat = repeat(initial_pred', n_eval, 1)
+        preds_mat = if init_model !== nothing
+            _predict_raw_for_init(init_model, num_bins, cat_enc, learning_rate)
+        else
+            repeat(initial_pred', n_eval, 1)
+        end
         class_labels = sort(unique(y_raw))
         label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
         y_onehot = zeros(Float64, n_eval, n_classes)
@@ -435,7 +503,11 @@ function _setup_eval(
             y_onehot=y_onehot,
         )
     else
-        preds_vec = fill(initial_pred_val, n_eval)
+        preds_vec = if init_model !== nothing
+            _predict_raw_for_init(init_model, num_bins, cat_enc, learning_rate)
+        else
+            fill(initial_pred_val, n_eval)
+        end
         return (
             num_bins=num_bins,
             cat_enc=cat_enc,
@@ -445,5 +517,35 @@ function _setup_eval(
             y_vec=y_raw,
             y_onehot=Matrix{Float64}(undef, 0, 0),
         )
+    end
+end
+
+# Compute raw (pre-link) predictions from `model.trees` on the already-quantized
+# features. Used to seed the running prediction vector/matrix when continuing
+# training from `init_model`. The new `learning_rate` is applied to inherited
+# trees, matching how `predict(final_model, ...)` will scale them after fit
+# finishes.
+function _predict_raw_for_init(
+    model::MichiBoostModel,
+    num_bins::AbstractMatrix{UInt16},
+    cat_encoded::AbstractMatrix{Float64},
+    learning_rate::Float64,
+)
+    n = size(num_bins, 1)
+    if model.is_multiclass
+        ip = model.initial_pred::Vector{Float64}
+        preds = repeat(ip', n, 1)
+        leaf_buf = Vector{Int}(undef, n)
+        @inbounds for tree in model.trees
+            predict_tree!(preds, tree, num_bins, cat_encoded, learning_rate, leaf_buf)
+        end
+        return preds
+    else
+        preds = fill(model.initial_pred::Float64, n)
+        leaf_buf = Vector{Int}(undef, n)
+        @inbounds for tree in model.trees
+            predict_tree!(preds, tree, num_bins, cat_encoded, learning_rate, leaf_buf)
+        end
+        return preds
     end
 end
