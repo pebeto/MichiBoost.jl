@@ -3,9 +3,9 @@
 
 Singleton tag types for the `eval_metric` keyword argument.
 
-Pass the bare type — for example `Metrics.AUC` — rather than instantiating it.
-Each method that consumes a metric dispatches on `::Type{<:Metric}` so typos
-become `UndefVarError` at parse time instead of runtime errors.
+Pass the bare type, not an instance. Methods that consume a metric dispatch
+on `::Type{<:Metric}`, so typos surface as `UndefVarError` at parse time
+rather than at runtime.
 
 ```julia
 clf = MichiBoostClassifier(;
@@ -13,8 +13,8 @@ clf = MichiBoostClassifier(;
 )
 ```
 
-CatBoost-style string names (e.g., `"AUC"`) still resolve to the corresponding
-type via `_resolve_metric`.
+CatBoost-style string names (`"AUC"`) and the matching Symbols (`:AUC`) also
+resolve to the corresponding type via `_resolve_metric`.
 """
 module Metrics
 
@@ -36,6 +36,7 @@ using .Metrics: Metric
 # Resolve a CatBoost-style string into a `Metric` singleton type. Used by the
 # wrapper API so users coming from CatBoost can keep writing
 # `eval_metric="AUC"`; idiomatic Julia callers pass `Metrics.AUC` directly.
+# A `Symbol` form (`:AUC`) is also accepted and routed through the string path.
 function _resolve_metric(name::AbstractString)
     upper = uppercase(String(name))
     upper == "RMSE" && return Metrics.RMSE
@@ -49,6 +50,8 @@ function _resolve_metric(name::AbstractString)
     return error("Unknown eval_metric name: `$name`")
 end
 
+_resolve_metric(name::Symbol) = _resolve_metric(String(name))
+
 # Build the (orientation, evaluator) pair for an early-stopping eval metric.
 # Dispatched on the singleton `Metric` type. Each method validates that the
 # metric is compatible with the inferred task (regression / binary / multiclass)
@@ -60,6 +63,10 @@ end
 # Matrix for multiclass. `raw_pred` is the running raw prediction (logits for
 # classification, values for regression).
 function _eval_metric(name::AbstractString, is_multiclass::Bool, n_classes::Int)
+    return _eval_metric(_resolve_metric(name), is_multiclass, n_classes)
+end
+
+function _eval_metric(name::Symbol, is_multiclass::Bool, n_classes::Int)
     return _eval_metric(_resolve_metric(name), is_multiclass, n_classes)
 end
 

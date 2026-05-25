@@ -38,7 +38,7 @@ end
 @testset "Sample weights are honored during training" begin
     using Random
     Random.seed!(42)
-    # Two classes with very different weights — the weighted model should
+    # Two classes with very different weights; the weighted model should
     # predict differently from the unweighted one.
     X = [0.0 1.0; 1.0 0.0; 2.0 0.0; 3.0 1.0; 4.0 0.0; 5.0 1.0]
     y = [0.0, 0.0, 1.0, 1.0, 0.0, 1.0]

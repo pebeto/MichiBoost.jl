@@ -2,7 +2,7 @@ using MichiBoost
 using Random, Statistics
 using Test
 
-@testset "score — regressor returns R²" begin
+@testset "score: regressor returns R²" begin
     Random.seed!(42)
     n = 1000
     X = randn(n, 5)
@@ -26,7 +26,7 @@ using Test
     @test s > 0.95   # the synthetic signal is easy
 end
 
-@testset "score — regressor edge cases" begin
+@testset "score: regressor edge cases" begin
     Random.seed!(0)
     X = randn(10, 3)
     y = fill(5.0, 10)
@@ -38,7 +38,7 @@ end
     @test score(model, X, y) == 1.0
 end
 
-@testset "score — classifier returns accuracy" begin
+@testset "score: classifier returns accuracy" begin
     Random.seed!(42)
     n = 600
     X = randn(n, 4)
@@ -58,7 +58,7 @@ end
     @test isapprox(s, expected; atol=1e-12)
 end
 
-@testset "score — classifier with string labels" begin
+@testset "score: classifier with string labels" begin
     Random.seed!(42)
     y = ["cat", "dog", "cat", "bird", "dog", "bird", "cat", "dog"]
     X = randn(8, 3)
@@ -71,7 +71,7 @@ end
     @test 0.0 <= s <= 1.0
 end
 
-@testset "score — multiclass classifier" begin
+@testset "score: multiclass classifier" begin
     Random.seed!(42)
     n = 600
     X = randn(n, 5)
@@ -91,7 +91,7 @@ end
     @test isapprox(s, expected; atol=1e-12)
 end
 
-@testset "score — accepts Pool" begin
+@testset "score: accepts Pool" begin
     Random.seed!(42)
     X = randn(100, 3)
     y = Float64.(X[:, 1] .> 0)
@@ -105,12 +105,12 @@ end
     @test s_pool == s_mat
 end
 
-@testset "score — fails on untrained model" begin
+@testset "score: fails on untrained model" begin
     model = MichiBoostRegressor(; iterations=10)
     @test_throws ErrorException score(model, randn(5, 2), [1.0, 2.0, 3.0, 4.0, 5.0])
 end
 
-@testset "score — mismatched lengths" begin
+@testset "score: mismatched lengths" begin
     Random.seed!(0)
     X = randn(20, 2)
     y = randn(20)

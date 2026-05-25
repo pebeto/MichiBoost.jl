@@ -10,35 +10,28 @@ _Michi (ミチ) means cat in Japanese._
 
 ## Features
 
-- **Pure Julia** — no Python, no C++ bindings, no CondaPkg
-- **Ordered target encoding** for native categorical feature handling without preprocessing
-- **Symmetric (oblivious) trees** as the base learner
-- **Histogram-based split finding** with quantile-based feature binning and pre-allocated buffers
-- **Low-overhead inference** for single rows and small batches (see [benchmark results](benchmark/README.md))
-- Regression (RMSE, MAE), binary classification (Logloss), and multi-class (Softmax)
-- **Custom loss functions** — subtype `LossFunction` for regression, binary,
-  or multi-class via the `task_type` / `link_inverse` traits
-- **SHAP values** for feature-level explanation of individual predictions
-- **Sample and class weights** — per-row weights via `Pool(...; weight=...)`,
-  per-class via `class_weights=Dict(...)` or `auto_class_weights="Balanced"`
-- Cross-validation (with optional **stratification**), early stopping with
-  configurable **eval metrics** (AUC, F1, Accuracy, R², ...), RSM feature
-  subsampling, model serialization
-- **Convergence diagnostics**: `staged_predict` / `staged_predict_proba`,
-  `eval_metrics`, `get_best_iteration` / `get_best_score`
-- **Compile-time-checked enums** for `loss_function`, `boosting_type`,
-  `eval_metric`, etc. via `Losses.*`, `BoostingTypes.*`, `Metrics.*`
-  submodules; CatBoost-style strings still accepted
+- **Pure Julia** gradient boosting with no Python or C++ dependencies.
+- **Native categorical handling** via ordered target encoding (CatBoost-style),
+  with no manual preprocessing.
+- **Symmetric (oblivious) decision trees** as the base learner, with
+  histogram-based split finding and threaded training.
+- **Custom loss functions** via the `LossFunction` interface for regression,
+  binary, and multi-class tasks.
+- **Standard toolkit**: sample and class weights, cross-validation (with
+  stratification), early stopping with configurable eval metrics, SHAP
+  values, model serialisation. See the [docs](https://pebeto.github.io/MichiBoost.jl/)
+  for the full list.
 
 ## Quick Start
 
 Run with threading enabled for best performance:
 
 ```bash
-julia -t 4   # or any thread count
+julia -t 4   # any thread count works
 ```
 
-This sets `Threads.nthreads()` which MichiBoost uses during training.
+This sets `Threads.nthreads()`, which MichiBoost uses during training and
+inference.
 
 ### Regression
 
@@ -65,13 +58,13 @@ y = [0.0, 0.0, 1.0, 1.0]
 model = MichiBoostClassifier(; iterations=100, learning_rate=0.1, depth=4)
 fit!(model, X, y)
 
-probs = predict_proba(model, X)   # P(class=1)
-classes = predict(model, X)        # predicted class labels
+probs = predict_proba(model, X)  # P(class=1)
+classes = predict(model, X)  # predicted class labels
 ```
 
 ### Categorical Features
 
-String columns are automatically detected as categorical:
+String columns are detected as categorical without further configuration:
 
 ```julia
 using MichiBoost, DataFrames
@@ -94,7 +87,7 @@ X = randn(100, 5)
 y = Float64.(X[:, 1] .+ X[:, 2] .> 0)
 
 pool = Pool(X; label=y)
-scores = cv(pool; fold_count=5, params=Dict("iterations" => 100, "depth" => 4))
+scores = cv(pool; fold_count=5, params=Dict(:iterations => 100, :depth => 4))
 println("Mean test loss: ", scores.mean_test_loss)
 ```
 
@@ -105,8 +98,8 @@ feature matrix `X`:
 
 ```julia
 shap = shap_values(model, X)
-# Regression / binary classification: (n_samples, n_features) matrix.
-# Multi-class:                        (n_samples, n_features, n_classes) array.
+# Regression and binary classification: (n_samples, n_features) matrix.
+# Multi-class: (n_samples, n_features, n_classes) array.
 ```
 
 ### Sample Weights
@@ -124,6 +117,11 @@ fit!(model, pool)
 
 ## Validation Against CatBoost
 
-MichiBoost.jl is benchmarked against the reference CatBoost implementation (via [CatBoost.jl](https://github.com/beacon-biosignals/CatBoost.jl)) across four axes: correctness on held-out data, a training/inference speed sweep, threading and real-dataset scaling (UCI Covertype), and the cost of each advertised feature (CV, early stopping, SHAP, RSM, sample weights, save/load).
+MichiBoost.jl is benchmarked against the reference CatBoost implementation
+(via [CatBoost.jl](https://github.com/beacon-biosignals/CatBoost.jl)) across
+four axes: correctness on held-out data, a training and inference speed
+sweep, threading and real-dataset scaling (UCI Covertype), and the cost of
+each advertised feature (CV, early stopping, SHAP, RSM, sample weights,
+save and load).
 
 See [`benchmark/README.md`](benchmark/README.md) for the full methodology, per-script commands, latest results, and caveats.

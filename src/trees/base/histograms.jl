@@ -3,7 +3,7 @@
 
 Fill row `li` of a numerical histogram from the samples in `group`, returning
 the (g_sum, h_sum, n) totals. Exists as a standalone function so Julia
-specializes on the concrete type of `group` (function barrier) — calling it
+specializes on the concrete type of `group` (function barrier); calling it
 from a loop with `group::Any` keeps the inner loop typed.
 """
 function _fill_num_leaf!(

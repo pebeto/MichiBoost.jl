@@ -1,32 +1,3 @@
-"""
-    Pool(data; label=nothing, cat_features=nothing, text_features=nothing,
-         feature_names=nothing, weight=nothing)
-
-Create a `Pool` from tabular data.
-
-# Arguments
-- `data`: any `Tables.jl`-compatible table (e.g. `DataFrame`, `NamedTuple` of
-  vectors) or an `AbstractMatrix`.
-- `label`: target vector.  Numeric values are kept as-is; string / categorical
-  values are automatically encoded to `Float64`.
-- `cat_features`: 1-based column indices (`Int`) or column names
-  (`Symbol` / `String`) of columns that should be treated as categorical.
-  String columns are auto-detected even without this argument.
-- `text_features`: same format as `cat_features`; treated identically
-  (as categorical).
-- `feature_names`: optional vector of column names.
-- `weight`: optional per-sample weights (`Vector{<:Real}`).
-
-# Examples
-```julia
-# From a matrix
-pool = Pool([1.0 2.0; 3.0 4.0]; label=[0.0, 1.0])
-
-# From a table with auto-detected categorical columns
-pool = Pool((color=["red","blue","red"], size=[1.0, 2.0, 3.0]);
-            label=[0.0, 1.0, 0.0])
-```
-"""
 function Pool(
     data;
     label=nothing,
@@ -64,7 +35,7 @@ function _build_pool(
     elseif data isa AbstractMatrix
         n_cols = size(data, 2)
         col_names = [Symbol("x$i") for i in 1:n_cols]
-        # Views instead of copies — `columns[idx][i]` becomes a cheap indirection
+        # Views instead of copies: `columns[idx][i]` becomes a cheap indirection
         # into the original matrix, avoiding an n × n_cols × 8-byte copy per
         # `Pool` call (3 MB on a 10k × 20 matrix, which dominated predict latency).
         columns = [view(data, :, i) for i in 1:n_cols]

@@ -97,7 +97,7 @@ end
 end
 
 @testset "Multiclass CV class-imbalanced folds" begin
-    # Class 3 appears only twice — with 3 folds it will be absent from
+    # Class 3 appears only twice; with 3 folds it will be absent from
     # at least one training fold. Unseen test samples should contribute
     # uniform-prior loss (-log(1/n_classes)), not zero.
     X = Float64.(reshape(1:30, 10, 3))

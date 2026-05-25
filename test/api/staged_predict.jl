@@ -2,7 +2,7 @@ using MichiBoost
 using Random
 using Test
 
-@testset "staged_predict — regressor shape and last-iter consistency" begin
+@testset "staged_predict: regressor shape and last-iter consistency" begin
     Random.seed!(0)
     n, p = 80, 4
     X = randn(n, p)
@@ -18,7 +18,7 @@ using Test
     @test s[:, end] ≈ predict(model, X)
 end
 
-@testset "staged_predict — binary classifier with all prediction types" begin
+@testset "staged_predict: binary classifier with all prediction types" begin
     Random.seed!(1)
     n = 80
     X = randn(n, 3)
@@ -44,7 +44,7 @@ end
     @test all(in(clf.model.class_labels), s_class)
 end
 
-@testset "staged_predict — multiclass: shapes and final consistency" begin
+@testset "staged_predict: multiclass: shapes and final consistency" begin
     Random.seed!(2)
     n = 90
     X = randn(n, 4)
@@ -73,7 +73,7 @@ end
     @test all(isapprox.(sums, 1.0; atol=1e-9))
 end
 
-@testset "staged_predict_proba — convenience for classifiers" begin
+@testset "staged_predict_proba: convenience for classifiers" begin
     Random.seed!(3)
     n = 60
     X = randn(n, 3)
@@ -86,12 +86,12 @@ end
         staged_predict(clf, X; prediction_type=PredictionTypes.Probability)
 end
 
-@testset "staged_predict — fails on untrained model" begin
+@testset "staged_predict: fails on untrained model" begin
     model = MichiBoostRegressor(; iterations=10)
     @test_throws ErrorException staged_predict(model, randn(5, 2))
 end
 
-@testset "staged_predict — early stopping truncates iterations" begin
+@testset "staged_predict: early stopping truncates iterations" begin
     Random.seed!(4)
     X = randn(300, 4)
     y = Float64.(X[:, 1] .+ X[:, 2] .> 0)

@@ -1,10 +1,12 @@
 # Classification
 
-MichiBoost.jl supports both binary and multi-class classification tasks.
+[`MichiBoostClassifier`](@ref) handles both binary (Logloss) and multi-class
+(Softmax) tasks. The loss is set automatically from the number of unique
+target values, so you rarely need to pass `loss_function` yourself. The full
+list of hyperparameters lives in the [Hyperparameters](hyperparameters.md)
+guide.
 
 ## Binary Classification
-
-For binary classification, use [`MichiBoostClassifier`](@ref) with the Logloss loss function:
 
 ```julia
 using MichiBoost
@@ -13,7 +15,6 @@ model = MichiBoostClassifier(;
     iterations=200,
     learning_rate=0.03,
     depth=6,
-    loss_function=Losses.Logloss,
 )
 
 fit!(model, X_train, y_train)
@@ -22,31 +23,27 @@ fit!(model, X_train, y_train)
 ### Prediction Types
 
 ```julia
-# Get probability of positive class
+# Probability of the positive class
 probabilities = predict_proba(model, X_test)
 
-# Get predicted class labels (default for classifiers)
+# Predicted class labels (default for classifiers)
 classes = predict(model, X_test)
 
-# Get raw logits (before sigmoid)
+# Raw logits (before sigmoid)
 logits = predict(model, X_test; prediction_type=PredictionTypes.RawFormulaVal)
-# or, CatBoost-style:
-logits = predict(model, X_test; prediction_type="RawFormulaVal")
 ```
 
-`predict(clf, X)` returns class labels by default. Pass
-`prediction_type=PredictionTypes.Probability` to get probabilities, or
-`prediction_type=PredictionTypes.RawFormulaVal` for the pre-transform scores.
-Strings (`"Probability"`, `"RawFormulaVal"`) are also accepted.
+See [`predict`](@ref) for the full list of `prediction_type` values and their
+string / Symbol aliases.
 
 ## Multi-Class Classification
 
-Multi-class classification is automatically detected when your target has more than 2 unique values:
+A target with more than two unique values trips the multi-class path
+automatically:
 
 ```julia
 using MichiBoost
 
-# Target with 3 classes
 y = [0, 1, 2, 0, 1, 2, 0, 1, 2]
 
 model = MichiBoostClassifier(; iterations=200)
@@ -70,30 +67,26 @@ classes = predict(model, X_test)
 ```julia
 using MichiBoost, Random, Statistics
 
-# Generate synthetic binary classification data
 Random.seed!(42)
 n = 1000
 X = randn(n, 5)
 y = Float64.(X[:, 1] .+ X[:, 2] .> 0)
 
-# Split data
 train_idx = 1:800
 test_idx = 801:1000
 
 X_train, y_train = X[train_idx, :], y[train_idx]
 X_test, y_test = X[test_idx, :], y[test_idx]
 
-# Train model
 model = MichiBoostClassifier(;
     iterations=200,
     learning_rate=0.05,
     depth=4,
-    verbose=true
+    verbose=true,
 )
 
 fit!(model, X_train, y_train)
 
-# Evaluate
 probs = predict_proba(model, X_test)
 preds = predict(model, X_test)
 
@@ -106,31 +99,26 @@ println("Test Accuracy: $(round(accuracy * 100, digits=2))%")
 ```julia
 using MichiBoost, Random, Statistics
 
-# Generate synthetic 3-class data
 Random.seed!(42)
 n = 900
 X = randn(n, 5)
 y = mod.(1:n, 3)  # Classes 0, 1, 2
 
-# Split data
 train_idx = 1:700
 test_idx = 701:900
 
 X_train, y_train = X[train_idx, :], y[train_idx]
 X_test, y_test = X[test_idx, :], y[test_idx]
 
-# Train model
 model = MichiBoostClassifier(;
     iterations=200,
     learning_rate=0.05,
     depth=4,
-    loss_function=Losses.MultiClass,
 )
 
 fit!(model, X_train, y_train)
 
-# Evaluate
-probs = predict_proba(model, X_test)  # Shape: (200, 3)
+probs = predict_proba(model, X_test)  # shape: (200, 3)
 preds = predict(model, X_test)
 
 accuracy = mean(preds .== y_test)
@@ -139,7 +127,7 @@ println("Test Accuracy: $(round(accuracy * 100, digits=2))%")
 
 ## Working with String Labels
 
-MichiBoost.jl automatically handles string class labels:
+String class labels round-trip without conversion:
 
 ```julia
 using MichiBoost
@@ -150,7 +138,7 @@ X = randn(6, 3)
 model = MichiBoostClassifier(; iterations=50)
 fit!(model, X, y)
 
-# Predictions return original string labels
+# Predictions return the original string labels
 predictions = predict(model, X)
 # ["cat", "dog", "cat", "bird", "dog", "bird"]
 ```

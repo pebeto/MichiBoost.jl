@@ -2,7 +2,7 @@ using MichiBoost: MichiBoost, MichiBoostClassifier
 using DataFrames
 using Test
 
-@testset "Categorical features — ordered encoding" begin
+@testset "Categorical features: ordered encoding" begin
     df = DataFrame(;
         cat1=["a", "b", "a", "b", "c", "c"],
         num1=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
@@ -17,7 +17,7 @@ using Test
     @test length(preds) == 6
 end
 
-@testset "Categorical features — plain encoding" begin
+@testset "Categorical features: plain encoding" begin
     df = DataFrame(;
         cat1=["a", "b", "a", "b", "c", "c"], num1=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     )

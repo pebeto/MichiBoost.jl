@@ -52,12 +52,10 @@ For automatic weighting from label frequency, pass `auto_class_weights` instead:
 
 ```julia
 clf = MichiBoostClassifier(; iterations=200, auto_class_weights=AutoClassWeights.Balanced)
-# or, CatBoost-style:
-clf = MichiBoostClassifier(; iterations=200, auto_class_weights="Balanced")
 ```
 
-- `AutoClassWeights.Balanced` — `weight[c] = n / (n_classes * count[c])`.
-- `AutoClassWeights.SqrtBalanced` — `weight[c] = sqrt(n / count[c])`. Less
+- `AutoClassWeights.Balanced`: `weight[c] = n / (n_classes * count[c])`.
+- `AutoClassWeights.SqrtBalanced`: `weight[c] = sqrt(n / count[c])`. Less
   aggressive than `Balanced`.
 
 `class_weights` and `auto_class_weights` are mutually exclusive.
@@ -82,6 +80,11 @@ result = cv(
 println("Mean train loss: ", result.mean_train_loss)
 println("Mean test loss:  ", result.mean_test_loss)
 ```
+
+The returned `NamedTuple` also exposes per-fold `train_loss` and `test_loss`
+vectors alongside the means shown above. `params` keys may be strings or
+symbols; the loss used to score each fold is taken from
+`params[:loss_function]` (default `"RMSE"`).
 
 For classification on imbalanced data, pass `stratified=true` so each fold
 preserves the global class proportions:
@@ -120,10 +123,6 @@ When early stopping was not active (no `eval_set` / `early_stopping_rounds`),
 `get_best_iteration` returns the total number of trees actually built and
 `get_best_score` returns `nothing`.
 
-The returned `NamedTuple` exposes `train_loss`, `test_loss`, `mean_train_loss`,
-and `mean_test_loss`. Keys in `params` may be strings or symbols. The loss
-function used is taken from `params[:loss_function]` (default `"RMSE"`).
-
 ## SHAP Values
 
 SHAP values explain individual predictions by attributing the deviation from
@@ -136,8 +135,8 @@ model = MichiBoostRegressor(; iterations=100)
 fit!(model, X_train, y_train)
 
 shap = shap_values(model, X_test)
-# Regression / binary classification: Matrix{Float64} of shape (n_samples, n_features)
-# Multi-class:                        Array{Float64,3} of shape (n_samples, n_features, n_classes)
+# Regression and binary classification: Matrix{Float64} of shape (n_samples, n_features)
+# Multi-class: Array{Float64,3} of shape (n_samples, n_features, n_classes)
 ```
 
 For each row `i`, `sum(shap[i, :])` is approximately equal to

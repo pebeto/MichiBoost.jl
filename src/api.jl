@@ -1,91 +1,9 @@
-"""
-    MichiBoostRegressor(; kwargs...) -> MichiBoostRegressor
-
-Create a gradient-boosted regression model.
-
-# Keyword Arguments
-- `iterations::Int=1000` — number of boosting rounds (trees to build).
-- `learning_rate::Float64=0.03` — step-size shrinkage applied to each tree.
-- `depth::Int=6` — depth of each symmetric tree.
-- `l2_leaf_reg::Float64=3.0` — L2 regularisation on leaf values.
-- `loss_function::Union{Type{<:Losses.LossKind},String,LossFunction}="RMSE"` —
-  pass a `Losses.*` tag type (e.g., `Losses.RMSE`), a CatBoost-style string,
-  or a custom [`LossFunction`](@ref) instance. Built-in regression options:
-  `Losses.RMSE` / `Losses.MAE`. Built-in classification options:
-  `Losses.Logloss`, `Losses.MultiClass` (auto-detected on classifier targets).
-  Custom `LossFunction` instances declare their task via
-  `task_type(::MyLoss)`; the wrapper enforces that `:regression` losses go to
-  `MichiBoostRegressor` and `:binary` / `:multiclass` losses go to
-  `MichiBoostClassifier`. See [`LossFunction`](@ref).
-- `border_count::Int=254` — max quantization borders per numerical feature.
-- `min_data_in_leaf::Int=1` — minimum samples required in a leaf.
-- `random_seed::Union{Int,Nothing}=nothing` — seed for reproducibility.
-- `verbose::Bool=false` — print training progress.
-- `boosting_type::Union{Type{<:BoostingTypes.BoostingType},String}="Ordered"` —
-  `BoostingTypes.Ordered` (or `"Ordered"`) uses a random permutation when
-  computing categorical target statistics (reduces leakage);
-  `BoostingTypes.Plain` (or `"Plain"`) encodes on the full training set.
-  Gradient computation is plain in both modes.
-- `early_stopping_rounds::Union{Int,Nothing}=nothing` — stop after this many
-  rounds without improvement on `eval_set`.
-- `eval_metric::Union{Type{<:Metric},String,Nothing}=nothing` — metric used to
-  drive the early-stopping comparison. When `nothing` (default), the training
-  loss is used. Pass a `Metrics.*` tag type for compile-time-checked names
-  (e.g., `eval_metric=Metrics.AUC`); CatBoost-style strings like `"AUC"` also
-  work. Supported tags — regression: [`Metrics.RMSE`](@ref), [`Metrics.MAE`](@ref),
-  [`Metrics.R2`](@ref); binary: [`Metrics.Logloss`](@ref),
-  [`Metrics.Accuracy`](@ref), [`Metrics.F1`](@ref), [`Metrics.AUC`](@ref);
-  multi-class: [`Metrics.MultiLogloss`](@ref), [`Metrics.Accuracy`](@ref).
-  Comparison direction is inferred per metric.
-
-# Example
-```julia
-model = MichiBoostRegressor(; iterations=200, depth=4)
-fit!(model, X, y)
-ŷ = predict(model, X_test)
-```
-"""
 function MichiBoostRegressor(; kwargs...)
     params = Dict{Symbol,Any}(kwargs...)
     haskey(params, :loss_function) || (params[:loss_function] = "RMSE")
     return MichiBoostRegressor(params, nothing)
 end
 
-"""
-    MichiBoostClassifier(; kwargs...) -> MichiBoostClassifier
-
-Create a gradient-boosted classification model.  Supports binary (Logloss) and
-multi-class (Softmax) targets.  Multi-class is auto-detected when the target has
-more than two unique values.
-
-Accepts the same keyword arguments as [`MichiBoostRegressor`](@ref), plus:
-
-- `loss_function::Union{Type{<:Losses.LossKind},String}="Logloss"` —
-  `Losses.Logloss` (or `"Logloss"`) for binary, `Losses.MultiClass` (or
-  `"MultiClass"`) for multi-class. Multi-class is auto-detected if omitted.
-- `class_weights::Union{AbstractDict,Nothing}=nothing` — per-class weights as a
-  `Dict(label => weight)`; multiplies into the per-sample weights at fit time.
-  Useful for imbalanced classification when adjusting per-row weights via
-  [`Pool`](@ref) is inconvenient.
-- `auto_class_weights::Union{Type{<:AutoClassWeights.AutoClassWeightMode},String,Nothing}=nothing` —
-  automatic class weighting derived from training-label frequencies.
-  `AutoClassWeights.Balanced` (or `"Balanced"`) sets each weight to
-  `n / (n_classes * count[c])`; `AutoClassWeights.SqrtBalanced` (or
-  `"SqrtBalanced"`) sets it to `sqrt(n / count[c])`. Mutually exclusive with
-  `class_weights`.
-
-# Example
-```julia
-model = MichiBoostClassifier(; iterations=200, depth=4)
-fit!(model, X, y)
-probs = predict_proba(model, X_test)   # probabilities
-labels = predict(model, X_test)        # class labels
-
-# Imbalanced binary: upweight the positive class 5×
-clf = MichiBoostClassifier(; iterations=200, class_weights=Dict(0.0 => 1.0, 1.0 => 5.0))
-fit!(clf, X, y)
-```
-"""
 function MichiBoostClassifier(; kwargs...)
     params = Dict{Symbol,Any}(kwargs...)
     haskey(params, :loss_function) || (params[:loss_function] = "Logloss")
@@ -96,19 +14,18 @@ end
     fit!(model, data, labels; cat_features=nothing, kwargs...) -> model
     fit!(model, pool::Pool; eval_set=nothing, kwargs...) -> model
 
-Train `model` in-place on the given data.
+Train `model` in-place on the given data. Returns the mutated `model` with its
+`.model` field populated.
 
 # Arguments
-- `model` — a [`MichiBoostRegressor`](@ref) or [`MichiBoostClassifier`](@ref).
-- `data` — a table, matrix, or [`Pool`](@ref).
-- `labels` — target vector (ignored when `data` is a [`Pool`](@ref) that already
-  has a label).
-- `cat_features` — 1-based categorical column indices or names.
-- `eval_set` — optional validation [`Pool`](@ref) for early stopping.
-- `kwargs...` — any hyperparameter accepted by the model constructor; overrides
+- `model`: a [`MichiBoostRegressor`](@ref) or [`MichiBoostClassifier`](@ref).
+- `data`: a table, matrix, or [`Pool`](@ref).
+- `labels`: target vector. Ignored when `data` is a [`Pool`](@ref) that
+  already has a label.
+- `cat_features`: 1-based categorical column indices or names.
+- `eval_set`: optional validation [`Pool`](@ref) for early stopping.
+- `kwargs...`: any hyperparameter accepted by the model constructor. Overrides
   the values stored in `model.params` for this call only.
-
-Returns the mutated `model` (with `.model` populated).
 
 # Example
 ```julia
@@ -203,10 +120,12 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
                 nothing
             elseif v isa Type && v <: Metric
                 v
-            elseif v isa AbstractString
+            elseif v isa AbstractString || v isa Symbol
                 _resolve_metric(v)
             else
-                error("`eval_metric` must be a `Metrics.*` type, a String, or `nothing`")
+                error(
+                    "`eval_metric` must be a `Metrics.*` type, a String, a Symbol, or `nothing`",
+                )
             end
         end,
         boosting_type=_to_string(
@@ -221,8 +140,9 @@ end
 # `name_fn` maps each concrete subtype to its canonical name.
 function _to_string(v, tag_super::Type, name_fn::Function, kwarg::AbstractString)
     v isa AbstractString && return String(v)
+    v isa Symbol && return String(v)
     v isa Type && v <: tag_super && return name_fn(v)
-    return error("`$kwarg` must be a tag type or a String, got `$(typeof(v))`")
+    return error("`$kwarg` must be a tag type, a String, or a Symbol, got `$(typeof(v))`")
 end
 
 # Return a new Pool whose `weight` has been multiplied by the per-class weight
@@ -305,7 +225,7 @@ end
 function _lookup_class_weight(class_weights::AbstractDict, key)
     haskey(class_weights, key) && return Float64(class_weights[key])
     # Fall back to value-equality so that Int(0) keys match Float64(0.0) labels
-    # and vice versa — common when users write `Dict(0 => 1.0, 1 => 5.0)`.
+    # and vice versa; common when users write `Dict(0 => 1.0, 1 => 5.0)`.
     for (k, v) in class_weights
         k == key && return Float64(v)
     end
@@ -313,30 +233,34 @@ function _lookup_class_weight(class_weights::AbstractDict, key)
 end
 
 """
-    predict(model, data; prediction_type="Class", cat_features=nothing)
+    predict(model, data; prediction_type=PredictionTypes.Class, cat_features=nothing)
 
 Generate predictions from a trained model.
 
 # Arguments
-- `model` — a trained [`MichiBoostRegressor`](@ref) or
+- `model`: a trained [`MichiBoostRegressor`](@ref) or
   [`MichiBoostClassifier`](@ref).
-- `data` — a table, matrix, or [`Pool`](@ref).
-- `prediction_type` — a `PredictionTypes` tag type (e.g.,
-  `PredictionTypes.Probability`) or its CatBoost-style string name:
-  - `PredictionTypes.Class` / `"Class"` (default) — regression values, or
-    predicted class labels for classifiers.
-  - `PredictionTypes.Probability` / `"Probability"` — predicted probabilities
-    (classification only).
-  - `PredictionTypes.RawFormulaVal` / `"RawFormulaVal"` — raw logits / scores
-    before any transformation.
-- `cat_features` — categorical column indices or names (only needed when `data`
-  is not a [`Pool`](@ref)).
+- `data`: a table, matrix, or [`Pool`](@ref).
+- `prediction_type`: selects the output format. Accepts a `PredictionTypes`
+  tag, its string name, or the matching Symbol:
+  - `PredictionTypes.Class` (default): regression values, or predicted class
+    labels for classifiers.
+  - `PredictionTypes.Probability`: predicted probabilities (classification
+    only).
+  - `PredictionTypes.RawFormulaVal`: raw logits or scores before any
+    transformation.
+- `cat_features`: categorical column indices or names. Only needed when `data`
+  is not a [`Pool`](@ref).
 
 # Returns
 - **Regressor**: `Vector{Float64}` of predicted values.
-- **Classifier** with `"Class"`: `Vector` of predicted class labels.
-- **Classifier** with `"Probability"`: `Vector{Float64}` (binary) or
-  `Matrix{Float64}` (multi-class, rows = samples, cols = classes).
+- **Classifier** with `PredictionTypes.Class`: `Vector` of predicted class
+  labels.
+- **Classifier** with `PredictionTypes.Probability`: `Vector{Float64}` for
+  binary, `Matrix{Float64}` for multi-class (rows index samples, columns
+  index classes).
+- **Classifier** with `PredictionTypes.RawFormulaVal`: `Vector{Float64}` for
+  binary logits, `Matrix{Float64}` for multi-class logits.
 
 # Example
 ```julia
@@ -364,8 +288,8 @@ end
 
 Return predicted probabilities from a trained classifier.
 
-- **Binary**: `Vector{Float64}` — probability of the positive class.
-- **Multi-class**: `Matrix{Float64}` — one column per class, rows sum to 1.
+- **Binary**: `Vector{Float64}`, the probability of the positive class.
+- **Multi-class**: `Matrix{Float64}` with one column per class; rows sum to 1.
 
 # Example
 ```julia
@@ -381,8 +305,12 @@ end
 """
     predict_classes(model, data)
 
-Return predicted class labels from a trained classifier.  Equivalent to
-`predict(model, data; prediction_type="Class")` for classifiers.
+Return predicted class labels from a trained classifier. Equivalent to
+`predict(model, data; prediction_type=PredictionTypes.Class)` for classifiers.
+
+For binary classification, the threshold is 0.5 on the positive-class
+probability. For multi-class, returns the class with the highest predicted
+probability.
 """
 function predict_classes end  # Actual method is on MichiBoostModel in predict.jl
 
@@ -430,22 +358,21 @@ end
 """
     staged_predict(model, data; prediction_type=PredictionTypes.Class, cat_features=nothing)
 
-Return predictions at every boosting iteration as an array. Useful for plotting
-convergence curves or picking a truncation point post-hoc.
+Return predictions at every boosting iteration as an array. Use it to plot
+convergence curves or to pick a truncation point post-hoc.
 
 # Returns
 
-- **Regressor**: `Matrix{Float64}` of shape `(n_samples, n_iterations)`.
-- **Binary classifier** with `Class`: `Matrix` of class labels of shape
-  `(n_samples, n_iterations)`.
-- **Binary classifier** with `Probability` or `RawFormulaVal`: `Matrix{Float64}`
-  of shape `(n_samples, n_iterations)`.
-- **Multi-class** with `Class`: `Matrix` of class labels.
-- **Multi-class** with `Probability` or `RawFormulaVal`: `Array{Float64,3}` of
-  shape `(n_samples, n_classes, n_iterations)`.
+| Task                         | `prediction_type`            | Shape                                      |
+| ---------------------------- | ---------------------------- | ------------------------------------------ |
+| Regression                   | any                          | `Matrix{Float64}` `(n_samples, n_iter)`    |
+| Binary classification        | `Class`                      | `Matrix` of class labels                   |
+| Binary classification        | `Probability`, `RawFormulaVal` | `Matrix{Float64}`                        |
+| Multi-class classification   | `Class`                      | `Matrix` of class labels                   |
+| Multi-class classification   | `Probability`, `RawFormulaVal` | `Array{Float64,3}` `(n_samples, n_classes, n_iter)` |
 
-The return is densely materialised; memory cost is `n_samples × n_iterations`
-(times `n_classes` for multi-class).
+The result is densely materialised; memory cost is `n_samples × n_iterations`,
+multiplied by `n_classes` in the multi-class case.
 """
 function staged_predict(
     m::MichiBoostWrapper, data; prediction_type=PredictionTypes.Class, cat_features=nothing
@@ -496,9 +423,8 @@ Per-iteration probabilities from a trained classifier. Equivalent to
 `staged_predict(model, data; prediction_type=PredictionTypes.Probability)`.
 
 # Returns
-
-- **Binary**: `Matrix{Float64}` of shape `(n_samples, n_iterations)` —
-  P(positive class) at each iteration.
+- **Binary**: `Matrix{Float64}` of shape `(n_samples, n_iterations)`, giving
+  the positive-class probability at each iteration.
 - **Multi-class**: `Array{Float64,3}` of shape
   `(n_samples, n_classes, n_iterations)`.
 """
@@ -512,13 +438,14 @@ end
     eval_metrics(model, pool::Pool; metrics) -> Dict{String,Vector{Float64}}
 
 Evaluate one or more metrics on a labelled `Pool` at every boosting iteration.
-Mirrors CatBoost's `eval_metrics`: returns a dictionary keyed by canonical
-metric name, with each value a vector of length `n_iterations` giving the
+Mirrors CatBoost's `eval_metrics`. Returns a dictionary keyed by canonical
+metric name; each value is a vector of length `n_iterations` giving the
 metric's value after `i` trees have been added.
 
-`metrics` is a vector of `Metrics.*` tag types and/or CatBoost-style strings
-(e.g. `[Metrics.AUC, "Logloss"]`). Each metric must be valid for the model's
-task (regression / binary / multi-class), or it errors.
+`metrics` is a vector of `Metrics.*` tag types, CatBoost-style strings, or
+Symbols, mixed freely (e.g. `[Metrics.AUC, "Logloss", :Accuracy]`). Each
+metric must be valid for the model's task (regression, binary, or
+multi-class), or `eval_metrics` raises an error.
 
 # Example
 ```julia
@@ -540,7 +467,7 @@ function eval_metrics(m::MichiBoostWrapper, pool::Pool; metrics::AbstractVector)
         # Build one-hot for multi-class metrics. The label-index mapping mirrors
         # the one `train` uses (sort + enumerate), so test pools with the same
         # class set produce consistent indices. Rows whose class is unseen at
-        # training time are left all-zero — they contribute zero target mass.
+        # training time are left all-zero; they contribute zero target mass.
         classes = sort(unique(y_raw))
         label_map = Dict(classes[i] => i for i in eachindex(classes))
         oh = zeros(Float64, length(y_raw), model.n_classes)
@@ -555,13 +482,13 @@ function eval_metrics(m::MichiBoostWrapper, pool::Pool; metrics::AbstractVector)
 
     out = Dict{String,Vector{Float64}}()
     for metric in metrics
-        metric_type = if metric isa AbstractString
+        metric_type = if metric isa AbstractString || metric isa Symbol
             _resolve_metric(metric)
         elseif metric isa Type && metric <: Metric
             metric
         else
             error(
-                "each entry in `metrics` must be a `Metrics.*` tag or a String, " *
+                "each entry in `metrics` must be a `Metrics.*` tag, a String, or a Symbol, " *
                 "got `$(typeof(metric))`",
             )
         end
@@ -585,18 +512,19 @@ end
 """
     shrink!(model, n::Integer) -> model
 
-Truncate the model's ensemble to its first `n` trees in place. Pure metadata
-change — predictions made after `shrink!` use only the retained trees. Useful
-for selecting a prefix of an early-stopped model (e.g., to roll back to the
-[`get_best_iteration`](@ref) snapshot) and for snapshot / resume workflows.
+Truncate the model's ensemble to its first `n` trees in place. Predictions
+made after `shrink!` use only the retained trees. Use it to roll back to an
+early-stopped snapshot (paired with [`get_best_iteration`](@ref)) or to
+implement resume workflows.
 
-`n` must satisfy `0 <= n <= length(model.trees)`. The model is returned for
-chaining; [`get_best_iteration`](@ref) / [`get_best_score`](@ref) are preserved
-as recorded during training and may now exceed `length(model.trees)`.
+`n` must satisfy `0 <= n <= length(model.trees)`. Returns `model` for
+chaining. [`get_best_iteration`](@ref) and [`get_best_score`](@ref) keep the
+values recorded during training, so `best_iteration` may exceed
+`length(model.trees)` after a shrink.
 
 # Example
 ```julia
-clf = MichiBoostClassifier(; iterations=200, early_stopping_rounds=10, ...)
+clf = MichiBoostClassifier(; iterations=200, early_stopping_rounds=10)
 fit!(clf, train_pool; eval_set=val_pool)
 shrink!(clf, get_best_iteration(clf))   # roll back to the ES best
 ```
@@ -633,7 +561,7 @@ function _predict_raw(model::MichiBoostModel, pool::Pool)
     # Row-chunk parallelism: each thread owns a disjoint slice of rows and
     # runs *all* trees against it.  Writes into view(preds, rows) are
     # naturally non-overlapping, so no partials buffers and no final reduction
-    # are needed — unlike tree-parallelism, which allocated nt × n partials
+    # are needed, unlike tree-parallelism, which allocated nt × n partials
     # per call and then summed them serially.  For tiny batches we skip the
     # fork entirely; the overhead isn't worth it.
     if model.is_multiclass
@@ -699,8 +627,9 @@ end
     feature_importance(model) -> Vector{Pair{Symbol, Float64}}
 
 Return feature importances as `feature_name => percentage` pairs, sorted by
-importance (descending).  Importance is based on how often each feature was
-chosen for a split across all trees.
+importance descending. Importance counts how often each feature is chosen for
+a split across all trees, normalised to a percentage. Features that never
+split get `0.0` and appear at the end of the returned vector.
 
 # Example
 ```julia
@@ -716,9 +645,9 @@ end
 """
     isfitted(model) -> Bool
 
-Return `true` if `model` has been trained (i.e., [`fit!`](@ref) has populated
-its underlying [`MichiBoostModel`](@ref)), `false` otherwise. Use it to guard
-prediction or inspection calls against untrained wrappers.
+Return `true` if [`fit!`](@ref) has populated `model.model`, `false`
+otherwise. Use it to guard prediction or inspection calls against untrained
+wrappers.
 
 # Example
 ```julia
@@ -733,9 +662,9 @@ isfitted(m::MichiBoostWrapper) = m.model !== nothing
 """
     get_params(model) -> Dict{Symbol,Any}
 
-Return a copy of the hyperparameters stored on the wrapper. The returned `Dict`
-is independent of the wrapper's internal state — mutating it will not affect
-`model`. Use [`set_params!`](@ref) to update them.
+Return a copy of the hyperparameters stored on the wrapper. Mutating the
+returned `Dict` does not affect `model`. Use [`set_params!`](@ref) to update
+them in place.
 
 # Example
 ```julia
@@ -748,9 +677,9 @@ get_params(m::MichiBoostWrapper) = copy(m.params)
 """
     set_params!(model; kwargs...) -> model
 
-Update hyperparameters on the wrapper, returning `model` for chaining. New keys
-are added; existing keys are overwritten. Changes only take effect on the next
-[`fit!`](@ref) call — already-trained models are not retrained.
+Update hyperparameters on the wrapper, returning `model` for chaining. New
+keys are added; existing keys are overwritten. Changes take effect on the
+next [`fit!`](@ref) call; already-trained models are not retrained.
 
 # Example
 ```julia
@@ -769,9 +698,9 @@ end
 """
     get_best_iteration(model) -> Int
 
-Return the iteration that achieved the best eval-metric value during early
-stopping (1-indexed). If early stopping was not active, returns the total
-number of iterations actually completed (i.e., `length(model.trees)`).
+Return the 1-indexed iteration whose eval-metric value was best during early
+stopping. When early stopping was not active, returns the total number of
+iterations completed (`length(model.trees)`).
 """
 function get_best_iteration(m::MichiBoostWrapper)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
@@ -782,9 +711,9 @@ get_best_iteration(model::MichiBoostModel) = model.best_iteration
 """
     get_best_score(model) -> Union{Float64,Nothing}
 
-Return the eval-metric value at [`get_best_iteration`](@ref). Returns `nothing`
-when early stopping was not active (no `eval_set` / `early_stopping_rounds`
-supplied at fit time).
+Return the eval-metric value at [`get_best_iteration`](@ref). Returns
+`nothing` when early stopping was not active (no `eval_set` or
+`early_stopping_rounds` supplied at fit time).
 """
 function get_best_score(m::MichiBoostWrapper)
     m.model === nothing && error("Model has not been trained. Call fit! first.")
@@ -795,14 +724,20 @@ get_best_score(model::MichiBoostModel) = model.best_score
 """
     score(model, data, y; cat_features=nothing) -> Float64
 
-Compute a default score for the trained model on `(data, y)`:
+Compute a default score for the trained model on `(data, y)`.
 
+# Arguments
+- `model`: a trained [`MichiBoostRegressor`](@ref) or
+  [`MichiBoostClassifier`](@ref).
+- `data`: a [`Pool`](@ref), a matrix, or any `Tables.jl`-compatible source.
+- `y`: target values matching the form used during training. Numeric for
+  regression; original class labels (numeric or string) for classification.
+- `cat_features`: categorical column indices or names. Only needed when `data`
+  is not a [`Pool`](@ref).
+
+# Returns
 - **Regressor**: coefficient of determination (R²).
-- **Classifier**: accuracy (fraction of predictions matching `y`).
-
-`data` can be a [`Pool`](@ref), a matrix, or any Tables.jl-compatible source. `y` must
-be supplied in the same form used during training (numeric for regression,
-original class labels for classification).
+- **Classifier**: accuracy, the fraction of predictions matching `y`.
 
 # Example
 ```julia
@@ -850,10 +785,14 @@ end
 
 Compute SHAP feature attributions for each sample.
 
-- **Regression / Binary**: returns `Matrix{Float64}` of shape `(n_samples, n_features)`.
-- **Multiclass**: returns `Array{Float64,3}` of shape `(n_samples, n_features, n_classes)`.
-
-Each row sums approximately to `prediction - mean_prediction`.
+# Returns
+- **Regression and binary classification**: `Matrix{Float64}` of shape
+  `(n_samples, n_features)`. Each row sums approximately to
+  `prediction - mean_prediction`.
+- **Multi-class**: `Array{Float64,3}` of shape
+  `(n_samples, n_features, n_classes)`. For each `(sample, class)` slice,
+  the per-feature contributions sum approximately to that class's raw score
+  minus its baseline.
 
 # Example
 ```julia
@@ -872,11 +811,12 @@ end
 """
     save_model(model, filepath::AbstractString)
 
-Serialize a trained model to disk using [JLD2.jl](https://github.com/JuliaIO/JLD2.jl)
-(HDF5-flavoured, version-stable across Julia versions).
+Serialise a trained model to `filepath` using
+[JLD2.jl](https://github.com/JuliaIO/JLD2.jl), an HDF5-flavoured format that
+is stable across Julia versions.
 
-Works with both wrapper types ([`MichiBoostRegressor`](@ref),
-[`MichiBoostClassifier`](@ref)) and raw [`MichiBoostModel`](@ref) objects.
+Accepts either a wrapper ([`MichiBoostRegressor`](@ref),
+[`MichiBoostClassifier`](@ref)) or a raw [`MichiBoostModel`](@ref).
 
 See also [`load_model`](@ref).
 """
@@ -922,8 +862,8 @@ function _stratified_folds(
             error(
                 "Stratified CV requires every class to have at least `fold_count` " *
                 "samples; class `$c` has $(length(c_idx)) but `fold_count=$fold_count`. " *
-                "Stratified CV is intended for classification labels — for continuous " *
-                "targets use `stratified=false`.",
+                "Stratified CV is intended for classification labels; for continuous " *
+                "targets pass `stratified=false`.",
             )
         end
         if shuffle
@@ -950,29 +890,34 @@ end
 Perform k-fold cross-validation on the given [`Pool`](@ref).
 
 # Arguments
-- `pool` — a [`Pool`](@ref) with labels.
-- `params` — `Dict` of training hyperparameters (string or symbol keys).
-- `fold_count` — number of folds.
-- `shuffle` — whether to shuffle indices before splitting.
-- `stratified` — if `true`, each fold preserves the class proportions of the
+- `pool`: a [`Pool`](@ref) with labels.
+- `params`: `Dict` of training hyperparameters. Keys may be `String` or
+  `Symbol`.
+- `fold_count`: number of folds.
+- `shuffle`: shuffle indices before splitting.
+- `stratified`: if `true`, each fold preserves the class proportions of the
   full label vector. Requires every class to have at least `fold_count`
-  samples; intended for classification labels.
-- `random_seed` — seed for the shuffle.
-- `verbose` — print per-fold results.
-- `kwargs...` — additional hyperparameters (merged with `params`).
+  samples. Intended for classification labels.
+- `random_seed`: seed for the shuffle.
+- `verbose`: print per-fold results.
+- `kwargs...`: additional hyperparameters, merged with `params`.
 
 # Returns
 A `NamedTuple` with fields:
-- `train_loss::Vector{Float64}` — training loss per fold.
-- `test_loss::Vector{Float64}` — test loss per fold.
+- `train_loss::Vector{Float64}`: training loss per fold.
+- `test_loss::Vector{Float64}`: test loss per fold.
 - `mean_train_loss::Float64`
 - `mean_test_loss::Float64`
 
 # Example
 ```julia
 pool = Pool(X; label=y)
-result = cv(pool; fold_count=5, stratified=true,
-            params=Dict("iterations" => 100, "depth" => 4))
+result = cv(
+    pool;
+    fold_count=5,
+    stratified=true,
+    params=Dict(:iterations => 100, :depth => 4),
+)
 println("Mean test loss: ", result.mean_test_loss)
 ```
 """
@@ -1045,7 +990,7 @@ function cv(
             train_logits = _predict_raw(model, train_pool)
             test_logits = _predict_raw(model, test_pool)
 
-            # Use the model's own class labels — avoids dimension mismatch when
+            # Use the model's own class labels to avoid dimension mismatch when
             # a class is absent from the training fold but present in the test fold.
             n_classes = model.n_classes
             label_map = Dict(model.class_labels[i] => i for i in 1:n_classes)

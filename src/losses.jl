@@ -38,7 +38,7 @@ function _softmax_matrix(logits::AbstractMatrix)
     return result
 end
 
-# In-place softmax — writes softmax of each row of `logits` into `out`.
+# In-place softmax: writes softmax of each row of `logits` into `out`.
 # Avoids the per-row allocations that _softmax / _softmax_matrix do.
 function _softmax_matrix!(out::AbstractMatrix, logits::AbstractMatrix)
     n_rows, n_cols = size(logits)
@@ -176,12 +176,21 @@ function make_loss(name::AbstractString; n_classes::Int=2)
     return error("Unknown loss function: $name. Supported: RMSE, MAE, Logloss, MultiClass")
 end
 
+make_loss(name::Symbol; kwargs...) = make_loss(String(name); kwargs...)
+
 """
     MichiBoost.Losses
 
 Singleton tag types for the `loss_function` keyword argument. Pass the bare
-type — for example `Losses.RMSE` — instead of the string `"RMSE"`. The
-CatBoost-style string form is still accepted at the wrapper boundary.
+type instead of a string. Typos in the tag form surface as `UndefVarError` at
+parse time, where strings would only fail at training.
+
+```julia
+model = MichiBoostRegressor(; loss_function=Losses.RMSE)
+```
+
+The CatBoost-style string form (`"RMSE"`) and the matching Symbol (`:RMSE`)
+are also accepted at the wrapper boundary.
 """
 module Losses
 

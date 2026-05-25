@@ -6,7 +6,7 @@ using Random
 using Statistics
 using Test
 
-@testset "eval_metric — regression dispatch" begin
+@testset "eval_metric: regression dispatch" begin
     o, fn = _eval_metric("RMSE", false, 0)
     @test o == :minimize
     @test isapprox(
@@ -26,7 +26,7 @@ using Test
     @test fn([1.0, 2.0, 3.0], [1.0, 2.0, 3.0]) ≈ 1.0
 end
 
-@testset "eval_metric — binary AUC matches direct rank computation" begin
+@testset "eval_metric: binary AUC matches direct rank computation" begin
     Random.seed!(0)
     n = 100
     y = Float64.(rand(Bool, n))
@@ -39,7 +39,7 @@ end
     @test _binary_auc(y, perfect_logits) ≥ 0.99
 end
 
-@testset "eval_metric — binary accuracy / f1 from logits" begin
+@testset "eval_metric: binary accuracy / f1 from logits" begin
     y = [0.0, 0.0, 1.0, 1.0, 1.0]
     # Threshold at 0.0: predicts {0, 1, 1, 0, 1}
     logits = [-1.0, 0.5, 1.0, -0.5, 2.0]
@@ -50,7 +50,7 @@ end
     @test _binary_f1(y, logits) ≈ 2 * prec * rec / (prec + rec)
 end
 
-@testset "eval_metric — multiclass accuracy" begin
+@testset "eval_metric: multiclass accuracy" begin
     y_onehot = [
         1.0 0.0 0.0
         0.0 1.0 0.0
@@ -65,13 +65,13 @@ end
     @test _mc_accuracy(y_onehot, logits) == 2 / 3
 end
 
-@testset "eval_metric — unknown metric errors" begin
+@testset "eval_metric: unknown metric errors" begin
     @test_throws ErrorException _eval_metric("Magic", false, 0)
     @test_throws ErrorException _eval_metric("Magic", false, 2)
     @test_throws ErrorException _eval_metric("Magic", true, 3)
 end
 
-@testset "eval_metric — AUC drives early stopping (binary)" begin
+@testset "eval_metric: AUC drives early stopping (binary)" begin
     Random.seed!(42)
     n = 600
     X = randn(n, 4)
@@ -100,7 +100,7 @@ end
     @test length(auc_es.model.trees) >= 1
 end
 
-@testset "eval_metric — R2 drives early stopping (regression)" begin
+@testset "eval_metric: R2 drives early stopping (regression)" begin
     Random.seed!(7)
     n = 400
     X = randn(n, 3)
@@ -116,7 +116,7 @@ end
     @test length(reg.model.trees) >= 1
 end
 
-@testset "Metrics — typed dispatch matches string dispatch" begin
+@testset "Metrics: typed dispatch matches string dispatch" begin
     # Same orientation/value from `Metrics.*` and the equivalent string.
     o_t, fn_t = _eval_metric(Metrics.RMSE, false, 0)
     o_s, fn_s = _eval_metric("RMSE", false, 0)
@@ -135,7 +135,7 @@ end
     @test o_t == :maximize
 end
 
-@testset "Metrics — task-mismatch errors" begin
+@testset "Metrics: task-mismatch errors" begin
     @test_throws ErrorException _eval_metric(Metrics.RMSE, false, 2)   # binary
     @test_throws ErrorException _eval_metric(Metrics.RMSE, true, 3)    # mc
     @test_throws ErrorException _eval_metric(Metrics.AUC, false, 0)    # reg
@@ -144,7 +144,7 @@ end
     @test_throws ErrorException _eval_metric(Metrics.MultiLogloss, false, 2)  # binary
 end
 
-@testset "_resolve_metric — known names" begin
+@testset "_resolve_metric: known names" begin
     @test _resolve_metric("RMSE") === Metrics.RMSE
     @test _resolve_metric("rmse") === Metrics.RMSE   # case-insensitive
     @test _resolve_metric("MAE") === Metrics.MAE
@@ -159,7 +159,7 @@ end
     @test_throws ErrorException _resolve_metric("nope")
 end
 
-@testset "Metrics tag — end-to-end via wrapper" begin
+@testset "Metrics tag: end-to-end via wrapper" begin
     Random.seed!(42)
     X = randn(400, 3)
     y = Float64.(X[:, 1] .+ X[:, 2] .> 0)

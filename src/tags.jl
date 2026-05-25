@@ -4,7 +4,8 @@
 Singleton tag types for the `boosting_type` keyword argument. `Ordered` uses a
 random permutation when computing categorical target statistics (reduces
 leakage); `Plain` encodes on the full training set. CatBoost-style strings
-(`"Ordered"`, `"Plain"`) are still accepted at the wrapper boundary.
+(`"Ordered"`, `"Plain"`) and the matching Symbols (`:Ordered`, `:Plain`) are
+still accepted at the wrapper boundary.
 """
 module BoostingTypes
 
@@ -25,7 +26,8 @@ _boosting_name(::Type{BoostingTypes.Plain}) = "Plain"
 
 Singleton tag types for the `auto_class_weights` keyword argument. `Balanced`
 sets each class weight to `n / (n_classes * count[c])`; `SqrtBalanced` uses
-`sqrt(n / count[c])`. CatBoost-style strings still work.
+`sqrt(n / count[c])`. CatBoost-style strings and the matching Symbols
+(`:Balanced`, `:SqrtBalanced`) still work.
 """
 module AutoClassWeights
 
@@ -47,7 +49,8 @@ _auto_class_weight_name(::Type{AutoClassWeights.SqrtBalanced}) = "SqrtBalanced"
 Singleton tag types for the `prediction_type` keyword argument of `predict`.
 `Class` returns regression values or predicted class labels; `Probability`
 returns probabilities (classification only); `RawFormulaVal` returns raw logits
-or scores before any transformation. CatBoost-style strings still work.
+or scores before any transformation. CatBoost-style strings and the matching
+Symbols (`:Class`, `:Probability`, `:RawFormulaVal`) still work.
 """
 module PredictionTypes
 

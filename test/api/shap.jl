@@ -2,7 +2,7 @@ using MichiBoost: MichiBoost, Pool, MichiBoostRegressor, MichiBoostClassifier, s
 using Random
 using Test
 
-@testset "SHAP values — regression" begin
+@testset "SHAP values: regression" begin
     Random.seed!(42)
     X = randn(50, 4)
     y = 2.0 .* X[:, 1] .- X[:, 2] .+ randn(50) .* 0.1
@@ -19,7 +19,7 @@ using Test
     @test argmax(mean_abs) == 1
 end
 
-@testset "SHAP values — binary classification" begin
+@testset "SHAP values: binary classification" begin
     Random.seed!(1)
     X = randn(60, 3)
     y = Float64.(X[:, 1] .+ X[:, 2] .> 0)
@@ -32,7 +32,7 @@ end
     @test all(isfinite, shap)
 end
 
-@testset "SHAP values — multiclass" begin
+@testset "SHAP values: multiclass" begin
     Random.seed!(7)
     X = randn(90, 4)
     y = Float64.(repeat([1, 2, 3], 30))
@@ -45,7 +45,7 @@ end
     @test all(isfinite, shap)
 end
 
-@testset "SHAP values — rows sum to prediction minus baseline (regression)" begin
+@testset "SHAP values: rows sum to prediction minus baseline (regression)" begin
     Random.seed!(42)
     X = randn(40, 4)
     y = 2.0 .* X[:, 1] .- X[:, 2] .+ randn(40) .* 0.1
@@ -63,7 +63,7 @@ end
     @test all(isapprox.(vec(sum(shap; dims=2)), raw .- expected_raw; atol=1e-10))
 end
 
-@testset "SHAP values — rows sum to prediction minus baseline (multiclass)" begin
+@testset "SHAP values: rows sum to prediction minus baseline (multiclass)" begin
     Random.seed!(7)
     X = randn(90, 4)
     y = Float64.(repeat([1, 2, 3], 30))
@@ -87,7 +87,7 @@ end
     end
 end
 
-@testset "SHAP values — accepts raw matrix" begin
+@testset "SHAP values: accepts raw matrix" begin
     X = [1.0 2.0; 3.0 4.0; 5.0 6.0; 7.0 8.0]
     y = [1.0, 2.0, 3.0, 4.0]
 

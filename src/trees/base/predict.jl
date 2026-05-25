@@ -2,9 +2,9 @@
 Add tree predictions into `out` in-place.
 
 `leaf_indices` is a pre-allocated `Vector{Int}` of length `n_samples` reused
-across trees to avoid per-call allocation.  The loop order is depth-outer,
-samples-inner so that each level reads a contiguous column of `num_bins` —
-cache-friendly in Julia's column-major layout.
+across trees to avoid per-call allocation. The loop order is depth-outer,
+samples-inner so that each level reads a contiguous column of `num_bins`,
+which is cache-friendly in Julia's column-major layout.
 """
 function predict_tree!(
     out::AbstractVector{Float64},

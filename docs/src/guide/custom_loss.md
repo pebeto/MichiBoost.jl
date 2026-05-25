@@ -27,7 +27,7 @@ optional traits with sensible defaults; three are required.
 | Trait | Default | When to override |
 |---|---|---|
 | `task_type(lf)` | `:regression` | Return `:binary` or `:multiclass` to declare the task. Drives label encoding and pred-tensor shape. |
-| `link_inverse(lf, raw)` | identity | Applied at prediction time to turn raw boosted scores into probabilities. Sigmoid for binary, row-wise softmax for multi-class. Used by `predict_proba` and `predict_classes`. For `:binary`, must return values in `[0, 1]` — `predict_classes` thresholds at 0.5. |
+| `link_inverse(lf, raw)` | identity | Applied at prediction time to turn raw boosted scores into probabilities. Sigmoid for binary, row-wise softmax for multi-class. Used by `predict_proba` and `predict_classes`. For `:binary`, must return values in `[0, 1]`; `predict_classes` thresholds at 0.5. |
 
 The wrapper validates that `task_type` matches the wrapper kind:
 `:regression` requires [`MichiBoostRegressor`](@ref);
@@ -36,8 +36,8 @@ The wrapper validates that `task_type` matches the wrapper kind:
 ### Buffer shapes
 
 The engine pre-allocates `g`, `h`, and `scratch` and reuses them across
-iterations — your `gradient_hessian!` should be allocation-free in the hot
-path.
+iterations, so your `gradient_hessian!` should stay allocation-free in the
+hot path.
 
 | `task_type` | `g`, `h`, `pred`, `scratch` | `y` |
 |---|---|---|
@@ -174,7 +174,7 @@ predict_proba(clf, X_test)
 ## Save / load
 
 Models trained with a custom loss round-trip through [`save_model`](@ref) and
-[`load_model`](@ref). The loss's type definition must be in scope when
-calling [`load_model`](@ref) — load the package or `include` the file that
-defines your loss before deserializing, otherwise JLD2 cannot reconstruct
+[`load_model`](@ref). The loss's type definition must be in scope when you
+call [`load_model`](@ref): load the package or `include` the file that
+defines your loss before deserialising. Otherwise JLD2 cannot reconstruct
 the instance.

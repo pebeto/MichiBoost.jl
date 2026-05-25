@@ -13,18 +13,6 @@ function _prepare_features(model::MichiBoostModel, pool::Pool)
     return num_bins, cat_encoded
 end
 
-"""
-    predict(model::MichiBoostModel, pool::Pool)
-
-Low-level prediction on a fitted [`MichiBoostModel`](@ref).
-
-Returns:
-- **Regression**: `Vector{Float64}` of predicted values.
-- **Binary classification**: `Vector{Float64}` of P(positive class).
-- **Multi-class**: `Matrix{Float64}` of probabilities (rows × classes).
-
-Most users should call `predict(wrapper_model, data)` instead.
-"""
 function predict(model::MichiBoostModel, pool::Pool)
     num_bins, cat_encoded = _prepare_features(model, pool)
     n = pool.n_samples
@@ -87,14 +75,6 @@ function predict(model::MichiBoostModel, pool::Pool)
     end
 end
 
-"""
-    predict_classes(model::MichiBoostModel, pool::Pool)
-
-Return predicted class labels from a fitted [`MichiBoostModel`](@ref).
-
-- **Binary**: returns the label with probability ≥ 0.5.
-- **Multi-class**: returns the label with the highest probability.
-"""
 function predict_classes(model::MichiBoostModel, pool::Pool)
     preds = predict(model, pool)
     if model.is_multiclass
@@ -109,14 +89,6 @@ function predict_classes(model::MichiBoostModel, pool::Pool)
     end
 end
 
-"""
-    feature_importance(model::MichiBoostModel) -> Vector{Pair{Symbol, Float64}}
-
-Compute feature importances based on split frequency across all trees.
-
-Each pair is `feature_name => percentage`, sorted descending.  Percentages sum
-to 100.  Features never used in any split get 0.
-"""
 function feature_importance(model::MichiBoostModel)
     n_num = length(model.borders)
     n_cat = if model.encoder !== nothing

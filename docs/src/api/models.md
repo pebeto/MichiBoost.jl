@@ -16,7 +16,7 @@ MichiBoostRegressor
 MichiBoostClassifier
 ```
 
-## Internal Model Type
+## Fitted Model
 
 ```@docs
 MichiBoostModel

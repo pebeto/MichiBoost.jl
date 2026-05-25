@@ -2,7 +2,7 @@ using MichiBoost
 using Random
 using Test
 
-@testset "isfitted — false before fit!, true after" begin
+@testset "isfitted: false before fit!, true after" begin
     Random.seed!(0)
     X = randn(40, 3)
     y = X[:, 1] .+ randn(40) .* 0.1
@@ -14,7 +14,7 @@ using Test
     @test isfitted(model) == true
 end
 
-@testset "isfitted — works for classifier" begin
+@testset "isfitted: works for classifier" begin
     Random.seed!(1)
     X = randn(60, 3)
     y = Float64.(X[:, 1] .> 0)
@@ -26,7 +26,7 @@ end
     @test isfitted(clf) == true
 end
 
-@testset "isfitted — survives shrink!" begin
+@testset "isfitted: survives shrink!" begin
     Random.seed!(2)
     X = randn(40, 2)
     y = X[:, 1] .+ randn(40) .* 0.1

@@ -88,7 +88,7 @@ end
 
 # Function-barrier helper for the multiclass Newton step: without this, the
 # @threads closure captures g_sum / h_sum in a Core.Box and every `+=`
-# allocates a fresh boxed Float64 — up to ~1.1M per boosting round.
+# allocates a fresh boxed Float64, up to ~1.1M per boosting round.
 @inline function _fill_leaf_values_mc!(
     leaf_values, l, group, gradients, hessians, n_classes, l2_leaf_reg
 )

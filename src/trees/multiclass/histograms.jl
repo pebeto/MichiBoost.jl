@@ -2,7 +2,7 @@
 Fill row `li` of a multiclass numerical histogram and accumulate per-class
 totals into `total_g[:, li]` / `total_h[:, li]` (zeroed inside). Returns `n`.
 Helper form provides a function barrier so Julia specializes on `group`'s
-concrete type — inlining the body into the caller would leave the hot loop
+concrete type. Inlining the body into the caller would leave the hot loop
 iterating over `Any`.
 """
 function _fill_num_leaf_mc!(
@@ -363,7 +363,7 @@ function _sweep_gain_mc(
     best_b = -1
 
     # The third gain term `total_g²/(total_h + λ)` depends only on (c, li), so
-    # lift it out of the b-sweep — at nb=256, leaves=64, classes=7 the inner
+    # lift it out of the b-sweep. At nb=256, leaves=64, classes=7 the inner
     # version recomputes ~115k divisions per feature per level.
     @inbounds for li in 1:n_leaves
         if total_n[li] == 0

@@ -4,7 +4,7 @@ function train(
     learning_rate::Float64=0.03,
     depth::Int=6,
     l2_leaf_reg::Float64=3.0,
-    loss_function::Union{String,LossFunction}="RMSE",
+    loss_function::Union{String,Symbol,LossFunction}="RMSE",
     border_count::Int=254,
     min_data_in_leaf::Int=1,
     random_seed::Union{Int,Nothing}=nothing,
@@ -12,10 +12,18 @@ function train(
     rsm::Float64=1.0,
     early_stopping_rounds::Union{Int,Nothing}=nothing,
     eval_pool::Union{Pool,Nothing}=nothing,
-    eval_metric::Union{Type{<:Metric},Nothing}=nothing,
-    boosting_type::String="Ordered",
+    eval_metric::Union{Type{<:Metric},AbstractString,Symbol,Nothing}=nothing,
+    boosting_type::Union{String,Symbol}="Ordered",
     kwargs...,
 )
+    # Normalise Symbol forms once at entry so the downstream `uppercase` / `==`
+    # comparisons keep operating on Strings.
+    loss_function isa Symbol && (loss_function = String(loss_function))
+    boosting_type isa Symbol && (boosting_type = String(boosting_type))
+    if eval_metric isa AbstractString || eval_metric isa Symbol
+        eval_metric = _resolve_metric(eval_metric)
+    end
+
     rng = random_seed !== nothing ? MersenneTwister(random_seed) : MersenneTwister()
 
     label = get_label(pool)
@@ -90,7 +98,7 @@ function train(
         [SplitBuffers(max_leaves, max_bins, n_samples) for _ in 1:nt]
     end
 
-    # Cut points per categorical feature — at low raw cardinality ordered
+    # Cut points per categorical feature. At low raw cardinality ordered
     # target statistics produce up to n_samples distinct encoded values, which
     # would make per-iteration histogram work O(n_samples).  Capping at
     # border_count+1 matches how numerical features are handled and keeps the
@@ -107,7 +115,7 @@ function train(
 
     leaf_indices = Vector{Int}(undef, n_samples)
 
-    # Early-stopping eval state — built once, updated incrementally each round
+    # Early-stopping eval state: built once, updated incrementally each round
     # so the ES check is O(1) per iteration instead of O(T). `_setup_eval`
     # returns the same NamedTuple shape in both the active and inactive cases
     # (empty matrices when inactive) so the loop can read `eval_state.*`
@@ -124,7 +132,7 @@ function train(
         initial_pred_val,
     )
 
-    # Buffers reused across every boosting round — without this the loop
+    # Buffers reused across every boosting round. Without this the loop
     # allocates an O(n × n_classes) matrix (or O(n) vector) 4-6 times per
     # iteration for gradient / hessian / softmax temporaries, which on
     # n=40k × k=7 adds up to ~100 MB / iter.
@@ -168,8 +176,8 @@ function train(
             grads_buf .*= weights
             hess_buf .*= weights
             # MAE is non-smooth: surrogate gradients (±1) drive split-finding,
-            # but leaf values must come from the residual weighted median —
-            # otherwise each round can shift predictions by at most
+            # but leaf values must come from the residual weighted median.
+            # Without this, each round shifts predictions by at most
             # learning_rate × 1, causing severe underfitting.
             if use_refine
                 refine_buf .= y .- predictions

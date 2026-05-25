@@ -66,7 +66,7 @@ function loss(lf::HuberLoss, y::AbstractVector, pred::AbstractVector)
     return s / length(y)
 end
 
-@testset "Custom LossFunction — UserRMSE matches built-in RMSE" begin
+@testset "Custom LossFunction: UserRMSE matches built-in RMSE" begin
     Random.seed!(0)
     X = randn(80, 3)
     y = X[:, 1] .+ 0.5 .* X[:, 2] .+ randn(80) .* 0.1
@@ -91,13 +91,13 @@ end
     @test pred_custom ≈ pred_builtin
 end
 
-@testset "Custom LossFunction — Huber fits and predicts sensibly" begin
+@testset "Custom LossFunction: Huber fits and predicts sensibly" begin
     Random.seed!(1)
     n = 120
     X = randn(n, 2)
     y = X[:, 1] .+ randn(n) .* 0.1
 
-    # Inject a few large outliers — Huber should be more robust than RMSE.
+    # Inject a few large outliers; Huber should be more robust than RMSE.
     outlier_idx = [10, 30, 60, 90]
     y[outlier_idx] .+= 50.0
 
@@ -119,7 +119,7 @@ end
     @test mae_huber < mae_baseline
 end
 
-@testset "Custom LossFunction — regression loss rejected by MichiBoostClassifier" begin
+@testset "Custom LossFunction: regression loss rejected by MichiBoostClassifier" begin
     Random.seed!(2)
     X = randn(40, 2)
     y = Float64.(X[:, 1] .> 0)
@@ -159,7 +159,7 @@ function loss(::UserBinaryLogloss, y::AbstractVector, pred::AbstractVector)
     return -mean(y .* log.(p) .+ (1.0 .- y) .* log.(1.0 .- p))
 end
 
-@testset "Custom LossFunction — UserBinaryLogloss matches built-in Logloss" begin
+@testset "Custom LossFunction: UserBinaryLogloss matches built-in Logloss" begin
     Random.seed!(10)
     X = randn(120, 3)
     y = Float64.(X[:, 1] .+ 0.5 .* X[:, 2] .> 0)
@@ -187,7 +187,7 @@ end
     @test classes_custom == classes_builtin
 end
 
-@testset "Custom LossFunction — binary loss rejected by MichiBoostRegressor" begin
+@testset "Custom LossFunction: binary loss rejected by MichiBoostRegressor" begin
     Random.seed!(11)
     X = randn(40, 2)
     y = Float64.(X[:, 1] .> 0)
@@ -243,7 +243,7 @@ function loss(::UserMultiClass, y_onehot::AbstractMatrix, pred::AbstractMatrix)
     return -mean(sum(y_onehot .* log.(probs); dims=2))
 end
 
-@testset "Custom LossFunction — UserMultiClass matches built-in MultiClass" begin
+@testset "Custom LossFunction: UserMultiClass matches built-in MultiClass" begin
     Random.seed!(20)
     X = randn(150, 3)
     # 3-class label by row sign-pattern
@@ -271,7 +271,7 @@ end
     @test proba_custom ≈ proba_builtin
 end
 
-@testset "Custom LossFunction — binary loss errors when data has >2 classes" begin
+@testset "Custom LossFunction: binary loss errors when data has >2 classes" begin
     Random.seed!(21)
     X = randn(60, 2)
     y = [Float64(i % 3) for i in 1:60]   # three classes
@@ -281,7 +281,7 @@ end
     @test_throws ErrorException fit!(clf, X, y)
 end
 
-@testset "Custom LossFunction — round-trip through save_model / load_model (binary)" begin
+@testset "Custom LossFunction: round-trip through save_model / load_model (binary)" begin
     Random.seed!(22)
     X = randn(80, 2)
     y = Float64.(X[:, 1] .> 0)
@@ -305,7 +305,7 @@ end
     rm(tmp; force=true)
 end
 
-@testset "Custom LossFunction — works with cv()" begin
+@testset "Custom LossFunction: works with cv()" begin
     Random.seed!(3)
     X = randn(60, 2)
     y = X[:, 1] .+ randn(60) .* 0.1

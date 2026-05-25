@@ -1,7 +1,7 @@
 """
     _shap_tree!(shap_row, tree, leaf_idx, lr, n_classes)
 
-Multiclass variant — `shap_row` has shape `(n_original_features, n_classes)`.
+Multiclass variant. `shap_row` has shape `(n_original_features, n_classes)`.
 """
 function _shap_tree!(
     shap_row::AbstractMatrix{Float64},

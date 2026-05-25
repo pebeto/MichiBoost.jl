@@ -2,7 +2,7 @@ using MichiBoost
 using Random
 using Test
 
-@testset "get_params — reflects constructor kwargs" begin
+@testset "get_params: reflects constructor kwargs" begin
     model = MichiBoostRegressor(; iterations=123, depth=4)
     p = get_params(model)
     @test p isa Dict{Symbol,Any}
@@ -11,14 +11,14 @@ using Test
     @test p[:loss_function] == "RMSE"   # default applied at construction
 end
 
-@testset "get_params — returns an independent copy" begin
+@testset "get_params: returns an independent copy" begin
     model = MichiBoostRegressor(; iterations=10)
     p = get_params(model)
     p[:iterations] = 999
     @test get_params(model)[:iterations] == 10  # wrapper untouched
 end
 
-@testset "set_params! — overrides and adds keys, returns wrapper" begin
+@testset "set_params!: overrides and adds keys, returns wrapper" begin
     model = MichiBoostRegressor(; iterations=10)
     returned = set_params!(model; iterations=50, depth=3)
     @test returned === model
@@ -27,7 +27,7 @@ end
     @test p[:depth] == 3
 end
 
-@testset "set_params! — affects subsequent fit!" begin
+@testset "set_params!: affects subsequent fit!" begin
     Random.seed!(0)
     X = randn(60, 3)
     y = X[:, 1] .+ randn(60) .* 0.1
@@ -38,7 +38,7 @@ end
     @test length(model.model.trees) == 20
 end
 
-@testset "set_params! — works after fit! (no retraining)" begin
+@testset "set_params!: works after fit! (no retraining)" begin
     Random.seed!(1)
     X = randn(40, 2)
     y = X[:, 1] .+ randn(40) .* 0.1
@@ -51,7 +51,7 @@ end
     @test get_params(model)[:iterations] == 200
 end
 
-@testset "get_params/set_params! — works for classifier" begin
+@testset "get_params/set_params!: works for classifier" begin
     clf = MichiBoostClassifier(; iterations=10)
     @test get_params(clf)[:loss_function] == "Logloss"
     set_params!(clf; depth=5)

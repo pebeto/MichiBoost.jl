@@ -6,25 +6,17 @@ _Michi (ミチ) means cat in Japanese._
 
 ## Features
 
-- **Pure Julia** — no Python, no C++ bindings, no CondaPkg
-- **Ordered target encoding** for native categorical feature handling without preprocessing
-- **Symmetric (oblivious) trees** as the base learner
-- **Histogram-based split finding** with quantile-based feature binning and pre-allocated buffers
-- **Low-overhead inference** for single rows and small batches
-- Regression (RMSE, MAE), binary classification (Logloss), and multi-class (Softmax)
-- **Custom loss functions** — subtype `LossFunction` for regression, binary,
-  or multi-class via the `task_type` / `link_inverse` traits
-- **SHAP values** for feature-level explanation of individual predictions
-- **Sample and class weights** — per-row weights via `Pool(...; weight=...)`,
-  per-class via `class_weights=Dict(...)` or `auto_class_weights="Balanced"`
-- Cross-validation (with optional **stratification**), early stopping with
-  configurable **eval metrics** (AUC, F1, Accuracy, R², ...), RSM feature
-  subsampling, model serialization
-- **Convergence diagnostics**: `staged_predict` / `staged_predict_proba`,
-  `eval_metrics`, `get_best_iteration` / `get_best_score`
-- **Compile-time-checked enums** for `loss_function`, `boosting_type`,
-  `eval_metric`, etc. via `Losses.*`, `BoostingTypes.*`, `Metrics.*`
-  submodules; CatBoost-style strings still accepted
+- **Pure Julia** gradient boosting with no Python or C++ dependencies.
+- **Native categorical handling** via ordered target encoding (CatBoost-style),
+  with no manual preprocessing.
+- **Symmetric (oblivious) decision trees** as the base learner, with
+  histogram-based split finding and threaded training.
+- **Custom loss functions** via the [`LossFunction`](@ref) interface for
+  regression, binary, and multi-class tasks.
+- **Standard toolkit**: sample and class weights, cross-validation (with
+  stratification), early stopping with configurable eval metrics, SHAP
+  values, model serialisation. See the [User Guide](guide/regression.md)
+  and [API Reference](api/models.md) for the full list.
 
 ## Installation
 

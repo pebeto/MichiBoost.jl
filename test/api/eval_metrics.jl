@@ -3,7 +3,7 @@ using Random
 using Statistics
 using Test
 
-@testset "eval_metrics — regression keys, shape, last-iter consistency" begin
+@testset "eval_metrics: regression keys, shape, last-iter consistency" begin
     Random.seed!(0)
     n = 100
     X = randn(n, 3)
@@ -26,7 +26,7 @@ using Test
     @test isapprox(res["R2"][end], score(model, X, y); atol=1e-9)
 end
 
-@testset "eval_metrics — binary keys, shape, monotone-ish trajectory" begin
+@testset "eval_metrics: binary keys, shape, monotone-ish trajectory" begin
     Random.seed!(1)
     n = 200
     X = randn(n, 4)
@@ -41,6 +41,12 @@ end
     @test Set(keys(res)) == Set(["Logloss", "AUC", "Accuracy"])
     @test all(length(v) == iters for v in values(res))
 
+    # Symbol-form entries resolve through the same dispatcher.
+    sym_res = eval_metrics(clf, pool; metrics=[:Logloss, :AUC, :Accuracy])
+    @test sym_res["Logloss"] == res["Logloss"]
+    @test sym_res["AUC"] == res["AUC"]
+    @test sym_res["Accuracy"] == res["Accuracy"]
+
     # Bounds.
     @test all(0.0 .<= res["AUC"] .<= 1.0)
     @test all(0.0 .<= res["Accuracy"] .<= 1.0)
@@ -49,7 +55,7 @@ end
     @test res["Accuracy"][end] >= res["Accuracy"][1]
 end
 
-@testset "eval_metrics — multiclass" begin
+@testset "eval_metrics: multiclass" begin
     Random.seed!(2)
     n = 150
     X = randn(n, 4)
@@ -70,7 +76,7 @@ end
     @test all(res["MultiLogloss"] .>= 0.0)
 end
 
-@testset "eval_metrics — task-mismatch errors propagate" begin
+@testset "eval_metrics: task-mismatch errors propagate" begin
     Random.seed!(3)
     X = randn(40, 2)
     y = randn(40)
@@ -81,7 +87,7 @@ end
     @test_throws ErrorException eval_metrics(model, pool; metrics=[Metrics.AUC])
 end
 
-@testset "eval_metrics — fails on unlabelled pool / untrained model" begin
+@testset "eval_metrics: fails on unlabelled pool / untrained model" begin
     pool = Pool(randn(5, 2))   # no label
     model = MichiBoostRegressor(; iterations=5)
     @test_throws ErrorException eval_metrics(model, pool; metrics=[Metrics.RMSE])
@@ -97,7 +103,7 @@ end
     )
 end
 
-@testset "eval_metrics — bad metric type errors" begin
+@testset "eval_metrics: bad metric type errors" begin
     Random.seed!(0)
     X = randn(20, 2)
     y = randn(20)

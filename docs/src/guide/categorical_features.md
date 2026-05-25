@@ -70,8 +70,6 @@ preceding samples only, reducing target leakage in the categorical statistics:
 
 ```julia
 model = MichiBoostRegressor(; boosting_type=BoostingTypes.Ordered)
-# or, CatBoost-style:
-model = MichiBoostRegressor(; boosting_type="Ordered")
 ```
 
 ### Plain Target Encoding

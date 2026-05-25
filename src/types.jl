@@ -3,7 +3,7 @@
 
 Abstract supertype for boosting loss functions. Subtype this to plug a custom
 loss into [`MichiBoostRegressor`](@ref) (regression) or
-[`MichiBoostClassifier`](@ref) (binary / multi-class). Required methods:
+[`MichiBoostClassifier`](@ref) (binary or multi-class).
 
 ```julia
 import MichiBoost: gradient_hessian!, initial_prediction, loss
@@ -12,30 +12,30 @@ import MichiBoost: task_type, link_inverse
 
 struct MyLoss <: MichiBoost.LossFunction end
 
-# Optional: declare the task — :regression (default), :binary, or :multiclass.
+# Optional: declare the task. One of :regression (default), :binary, :multiclass.
 # Drives label encoding and the shape of the buffers passed to gradient_hessian!.
 task_type(::MyLoss) = :regression
 
 # Optional: applied at predict time to turn raw scores into probabilities.
-# Identity by default; provide sigmoid for :binary, row-wise softmax for :multiclass.
+# Identity by default; sigmoid for :binary, row-wise softmax for :multiclass.
 link_inverse(::MyLoss, raw) = raw
 
-# Required: fused, in-place gradient + hessian. Buffer shapes match `task_type`:
-#   :regression / :binary   → vectors  (length n_samples)
-#   :multiclass             → matrices (n_samples × n_classes)
+# Required: fused, in-place gradient + hessian. Buffer shapes match task_type:
+#   :regression, :binary   → vectors  (length n_samples)
+#   :multiclass            → matrices (n_samples × n_classes)
 # `scratch` is a same-shape buffer the engine reuses; ignore it if unused.
 gradient_hessian!(g, h, ::MyLoss, y, pred, scratch) = ...
 
-# Required: starting boosting prediction. Scalar for regression / binary;
+# Required: starting boosting prediction. Scalar for regression and binary;
 # `Vector{Float64}` of length n_classes for multiclass.
 initial_prediction(::MyLoss, y) = ...
 
-# Required: scalar training loss; used for the verbose log and as the default
+# Required: scalar training loss. Used for the verbose log and as the default
 # early-stopping signal.
 loss(::MyLoss, y, pred) = ...
 ```
 
-The wrapper validates that `task_type` matches the wrapper:
+The wrapper validates that `task_type` matches the wrapper kind:
 `:regression` requires [`MichiBoostRegressor`](@ref); `:binary` and
 `:multiclass` require [`MichiBoostClassifier`](@ref). See the
 "Custom Loss Functions" guide for full examples.
@@ -53,23 +53,47 @@ struct MultiClassLoss <: LossFunction
 end
 
 """
-    Pool
+    Pool(data; label=nothing, cat_features=nothing, text_features=nothing,
+         feature_names=nothing, weight=nothing)
 
 Data container for training and prediction.
 
 Stores numerical features as a `Float64` matrix, categorical features as
-integer-encoded vectors, labels, sample weights, and feature metadata.
-String columns are automatically detected as categorical.
+integer-encoded vectors, labels, sample weights, and feature metadata. String
+columns are detected as categorical without further configuration.
 
-Construct via the `Pool` constructor with keyword arguments for `label`,
-`cat_features`, `weight`, etc.
+# Arguments
+- `data`: any `Tables.jl`-compatible table (e.g. `DataFrame`, `NamedTuple` of
+  vectors) or an `AbstractMatrix`.
+- `label`: target vector. Numeric values are kept as-is; string and
+  categorical values are encoded to `Float64`.
+- `cat_features`: 1-based column indices (`Int`) or column names (`Symbol`
+  or `String`) to treat as categorical. String columns are detected even
+  without this argument.
+- `text_features`: same format as `cat_features`. Columns listed here are
+  treated identically to categorical columns.
+- `feature_names`: optional vector of column names.
+- `weight`: optional per-sample weights (`Vector{<:Real}`).
 
 # Fields
-- `n_samples::Int` — number of rows
-- `n_features::Int` — total number of columns (numerical + categorical)
-- `label` — target vector (`Float64`), or `nothing`
-- `weight` — sample weights, or `nothing`
-- `feature_names` — column names as `Symbol`s
+- `n_samples::Int`: number of rows.
+- `n_features::Int`: total number of columns (numerical plus categorical).
+- `label`: target vector (`Float64`), or `nothing`.
+- `weight`: sample weights, or `nothing`.
+- `feature_names`: column names as `Symbol`s.
+
+# Examples
+```julia
+# From a matrix
+pool = Pool([1.0 2.0; 3.0 4.0]; label=[0.0, 1.0])
+
+# From a table; `color` is detected as categorical, `size` stays numerical
+pool = Pool((color=["red","blue","red"], size=[1.0, 2.0, 3.0]);
+            label=[0.0, 1.0, 0.0])
+
+# With per-sample weights
+pool = Pool(X; label=y, weight=[1.0, 2.0, 0.5, 1.0])
+```
 """
 mutable struct Pool
     features_numerical::Matrix{Float64}
@@ -114,7 +138,7 @@ end
 
 # Concrete element type for leaf groups.  `_apply_split!` returns a vector of
 # these; keeping the element type concrete avoids dynamic dispatch on every
-# `group[k]` / `length(group)` in the hot loops — a `Vector{Any}` here cost
+# `group[k]` / `length(group)` in the hot loops. A `Vector{Any}` here cost
 # ~800k boxed-Int allocations per boosting round.
 const LeafGroupView = SubArray{Int64,1,Vector{Int64},Tuple{UnitRange{Int64}},true}
 
@@ -370,11 +394,15 @@ end
 """
     MichiBoostModel
 
-The fitted model stored inside a [`MichiBoostRegressor`](@ref) /
-[`MichiBoostClassifier`](@ref) after [`fit!`](@ref).  Contains the tree
-ensemble and everything needed for prediction.
+The fitted model stored inside a [`MichiBoostRegressor`](@ref) or
+[`MichiBoostClassifier`](@ref) after [`fit!`](@ref). Holds the tree ensemble,
+the per-feature quantization borders, the categorical target-statistics
+encoder, and any state recorded by early stopping.
 
-Not typically constructed directly — use [`fit!`](@ref) instead.
+Construct it by calling [`fit!`](@ref) on a wrapper, or by deserialising a
+saved file with [`load_model`](@ref). Once you hold a `MichiBoostModel`, pass
+it as the first argument to [`predict`](@ref), [`predict_classes`](@ref), or
+[`feature_importance`](@ref) the same way you would a wrapper.
 """
 mutable struct MichiBoostModel
     trees::Union{Vector{SymmetricTree},Vector{SymmetricTreeMultiClass}}
@@ -403,15 +431,56 @@ mutable struct MichiBoostModel
 end
 
 """
-    MichiBoostRegressor
+    MichiBoostRegressor(; kwargs...) -> MichiBoostRegressor
 
 A gradient-boosted regression model using symmetric (oblivious) decision trees.
 
-Create with `MichiBoostRegressor(; kwargs...)`, train with
-[`fit!`](@ref), and generate predictions with [`predict`](@ref).
-
+Train with [`fit!`](@ref) and generate predictions with [`predict`](@ref).
 After training, the fitted [`MichiBoostModel`](@ref) is accessible via the
 `.model` field.
+
+# Keyword Arguments
+- `iterations::Int=1000`: number of boosting rounds (trees to build).
+- `learning_rate::Float64=0.03`: step-size shrinkage applied to each tree.
+- `depth::Int=6`: depth of each symmetric tree.
+- `l2_leaf_reg::Float64=3.0`: L2 regularisation on leaf values.
+- `loss_function::Union{Type{<:Losses.LossKind},String,Symbol,LossFunction}="RMSE"`:
+  built-in regression options: `Losses.RMSE`, `Losses.MAE`; classification
+  options: `Losses.Logloss`, `Losses.MultiClass` (auto-detected on classifier
+  targets). Pass a custom [`LossFunction`](@ref) instance to use your own loss.
+  Custom losses declare their task via `task_type(::MyLoss)`; the wrapper
+  enforces that `:regression` losses go to `MichiBoostRegressor` and `:binary`
+  or `:multiclass` losses go to `MichiBoostClassifier`. See
+  [`LossFunction`](@ref).
+- `border_count::Int=254`: max quantization borders per numerical feature.
+- `min_data_in_leaf::Int=1`: minimum samples required in a leaf.
+- `random_seed::Union{Int,Nothing}=nothing`: seed for reproducibility.
+- `verbose::Bool=false`: print training progress.
+- `boosting_type::Union{Type{<:BoostingTypes.BoostingType},String,Symbol}="Ordered"`:
+  `BoostingTypes.Ordered` uses a random permutation when computing categorical
+  target statistics, reducing leakage. `BoostingTypes.Plain` encodes on the
+  full training set. Gradient computation is plain in both modes.
+- `early_stopping_rounds::Union{Int,Nothing}=nothing`: stop after this many
+  rounds without improvement on `eval_set`.
+- `eval_metric::Union{Type{<:Metric},String,Symbol,Nothing}=nothing`: metric
+  used to drive the early-stopping comparison. `nothing` (default) falls back
+  to the training loss. Supported tags: `Metrics.RMSE`, `Metrics.MAE`,
+  `Metrics.R2` for regression; `Metrics.Logloss`, `Metrics.Accuracy`,
+  `Metrics.F1`, `Metrics.AUC` for binary; `Metrics.MultiLogloss`,
+  `Metrics.Accuracy` for multi-class. Comparison direction is inferred per
+  metric.
+
+Tag-valued keywords (`loss_function`, `boosting_type`, `eval_metric`) accept
+their value as the tag (e.g. `Losses.RMSE`), the matching string (`"RMSE"`),
+or the matching Symbol (`:RMSE`); the tag form is checked at parse time, so
+typos surface as `UndefVarError` rather than as a runtime error.
+
+# Example
+```julia
+model = MichiBoostRegressor(; iterations=200, depth=4)
+fit!(model, X, y)
+ŷ = predict(model, X_test)
+```
 """
 mutable struct MichiBoostRegressor
     params::Dict{Symbol,Any}
@@ -419,17 +488,46 @@ mutable struct MichiBoostRegressor
 end
 
 """
-    MichiBoostClassifier
+    MichiBoostClassifier(; kwargs...) -> MichiBoostClassifier
 
 A gradient-boosted classification model using symmetric (oblivious) decision
-trees.  Supports binary (Logloss) and multi-class (Softmax) targets.
+trees. Supports binary (Logloss) and multi-class (Softmax) targets; multi-class
+is auto-detected when the target has more than two unique values.
 
-Create with `MichiBoostClassifier(; kwargs...)`, train with
-[`fit!`](@ref), and generate predictions with [`predict`](@ref),
-[`predict_proba`](@ref), or [`predict_classes`](@ref).
+Train with [`fit!`](@ref) and generate predictions with [`predict`](@ref),
+[`predict_proba`](@ref), or [`predict_classes`](@ref). After training, the
+fitted [`MichiBoostModel`](@ref) is accessible via the `.model` field.
 
-After training, the fitted [`MichiBoostModel`](@ref) is accessible via the
-`.model` field.
+# Keyword Arguments
+Accepts the same keyword arguments as [`MichiBoostRegressor`](@ref), plus:
+
+- `loss_function::Union{Type{<:Losses.LossKind},String,Symbol}="Logloss"`:
+  `Losses.Logloss` for binary, `Losses.MultiClass` for multi-class.
+  Multi-class is auto-detected if omitted.
+- `class_weights::Union{AbstractDict,Nothing}=nothing`: per-class weights as a
+  `Dict(label => weight)`. Multiplied into the per-sample weights at fit
+  time. Use it for imbalanced classification when adjusting per-row weights
+  via [`Pool`](@ref) is inconvenient.
+- `auto_class_weights::Union{Type{<:AutoClassWeights.AutoClassWeightMode},String,Symbol,Nothing}=nothing`:
+  automatic class weighting derived from training-label frequencies.
+  `AutoClassWeights.Balanced` sets each weight to `n / (n_classes * count[c])`;
+  `AutoClassWeights.SqrtBalanced` sets it to `sqrt(n / count[c])`. Mutually
+  exclusive with `class_weights`.
+
+`loss_function` and `auto_class_weights` follow the same tag, string, or
+Symbol convention as the [`MichiBoostRegressor`](@ref) keywords.
+
+# Example
+```julia
+model = MichiBoostClassifier(; iterations=200, depth=4)
+fit!(model, X, y)
+probs = predict_proba(model, X_test)   # probabilities
+labels = predict(model, X_test)        # class labels
+
+# Imbalanced binary: upweight the positive class 5×
+clf = MichiBoostClassifier(; iterations=200, class_weights=Dict(0.0 => 1.0, 1.0 => 5.0))
+fit!(clf, X, y)
+```
 """
 mutable struct MichiBoostClassifier
     params::Dict{Symbol,Any}

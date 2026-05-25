@@ -33,7 +33,7 @@ function apply_borders(numerical_data::Matrix{Float64}, borders::Vector{Vector{F
             _apply_borders_column!(bins, numerical_data, borders[j], j, n_samples)
         end
     else
-        # Parallelise over features — each column writes to a disjoint region of
+        # Parallelise over features: each column writes to a disjoint region of
         # `bins`, so no synchronisation is needed.  Columnar access also matches
         # Julia's column-major layout for cache locality.
         Threads.@threads :static for j in 1:n_features
@@ -50,7 +50,7 @@ end
 )
     nb = length(b)
     if nb <= 32
-        # Linear scan with early exit — faster than binary search for small
+        # Linear scan with early exit. Faster than binary search for small
         # border counts due to branch prediction and no function call overhead.
         @inbounds for i in 1:n_samples
             v = data[i, j]
@@ -72,8 +72,8 @@ end
     _quantile_cut_points(col, max_points)
 
 Return up to `max_points` sorted values from `col`, evenly spaced through its
-unique-sorted values.  Used to cap the bin count of target-encoded categorical
-columns — at low raw cardinality ordered target statistics produce up to
+unique-sorted values. Used to cap the bin count of target-encoded categorical
+columns: at low raw cardinality, ordered target statistics produce up to
 `n_samples` distinct encoded values, which would make the per-iteration
 histogram zeroing and split sweep O(n_samples) rather than O(max_points).
 """

@@ -2,7 +2,7 @@ using MichiBoost
 using Random
 using Test
 
-@testset "shrink! — truncates trees in place" begin
+@testset "shrink!: truncates trees in place" begin
     Random.seed!(0)
     X = randn(80, 3)
     y = X[:, 1] .+ randn(80) .* 0.1
@@ -17,7 +17,7 @@ using Test
     @test length(model.model.trees) == 5
 end
 
-@testset "shrink! — predictions match staged snapshot" begin
+@testset "shrink!: predictions match staged snapshot" begin
     Random.seed!(1)
     X = randn(60, 3)
     y = X[:, 1] .+ randn(60) .* 0.1
@@ -35,7 +35,7 @@ end
     @test predict(model, X) ≈ expected
 end
 
-@testset "shrink! — n=0 leaves only the initial prediction" begin
+@testset "shrink!: n=0 leaves only the initial prediction" begin
     Random.seed!(2)
     X = randn(40, 2)
     y = X[:, 1] .+ randn(40) .* 0.1
@@ -50,7 +50,7 @@ end
     @test all(preds .≈ model.model.initial_pred)
 end
 
-@testset "shrink! — n equals current length is a no-op" begin
+@testset "shrink!: n equals current length is a no-op" begin
     Random.seed!(3)
     X = randn(40, 2)
     y = randn(40)
@@ -62,7 +62,7 @@ end
     @test predict(model, X) ≈ before
 end
 
-@testset "shrink! — out-of-range raises" begin
+@testset "shrink!: out-of-range raises" begin
     Random.seed!(0)
     X = randn(20, 2)
     y = randn(20)
@@ -74,12 +74,12 @@ end
     @test_throws ErrorException shrink!(model, length(model.model.trees) + 1)
 end
 
-@testset "shrink! — fails on untrained wrapper" begin
+@testset "shrink!: fails on untrained wrapper" begin
     model = MichiBoostRegressor(; iterations=5)
     @test_throws ErrorException shrink!(model, 1)
 end
 
-@testset "shrink! — pairs with get_best_iteration" begin
+@testset "shrink!: pairs with get_best_iteration" begin
     Random.seed!(4)
     X = randn(300, 4)
     y = Float64.(X[:, 1] .+ X[:, 2] .> 0)
