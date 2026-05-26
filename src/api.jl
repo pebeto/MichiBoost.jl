@@ -145,6 +145,10 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
                 )
             end
         end,
+        snapshot_path=let v = get(p, :snapshot_path, nothing)
+            v === nothing ? nothing : String(v)
+        end,
+        snapshot_interval=Int(get(p, :snapshot_interval, 100)),
     )
     return m
 end

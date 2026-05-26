@@ -218,3 +218,39 @@ match `predict(base, X)` even before any new trees fire.
 `early_stopping_rounds` works with `init_model`: the eval metric runs over the
 full ensemble after each new tree, and `best_iteration` counts from tree #1 of
 the inherited model, not from the first newly added tree.
+
+## Snapshots
+
+Set `snapshot_path` to write the partial model to disk during training.
+MichiBoost serialises the current model every `snapshot_interval` iterations
+and once more after the training loop exits, using JLD2. Each write overwrites
+the previous file, so only the latest snapshot survives.
+
+```julia
+model = MichiBoostRegressor(;
+    iterations=10_000,
+    snapshot_path="checkpoint.jld2",
+    snapshot_interval=500,
+)
+fit!(model, X_train, y_train)
+```
+
+If the process crashes or you cancel it, load the file and resume with
+`init_model`:
+
+```julia
+snap = load_model("checkpoint.jld2")
+resumed = MichiBoostRegressor(;
+    iterations=10_000 - length(snap.trees),
+    learning_rate=0.03,  # match the original fit
+)
+fit!(resumed, X_train, y_train; init_model=snap)
+```
+
+The final on-disk snapshot matches the model [`fit!`](@ref) returns. That
+includes early-stopping truncation: when `early_stopping_rounds` triggers a
+break, the post-loop save writes the truncated `trees[1:best_iteration]`, not
+the trees built between the last interval and the break.
+
+`snapshot_interval` must be `>= 1`. [`fit!`](@ref) errors before training
+starts otherwise.

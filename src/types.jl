@@ -469,6 +469,17 @@ After training, the fitted [`MichiBoostModel`](@ref) is accessible via the
   `Metrics.F1`, `Metrics.AUC` for binary; `Metrics.MultiLogloss`,
   `Metrics.Accuracy` for multi-class. Comparison direction is inferred per
   metric.
+- `init_model::Union{MichiBoostModel,Nothing}=nothing`: resume training from
+  a previously fitted model. The new fit inherits every tree of `init_model`
+  and adds `iterations` more on top. See the "Continuing Training" section in
+  the Advanced guide.
+- `snapshot_path::Union{AbstractString,Nothing}=nothing`: when set, the
+  partial model is serialised to this file every `snapshot_interval`
+  iterations and once more after training finishes. Load the file with
+  [`load_model`](@ref) and resume training by passing the result as
+  `init_model`.
+- `snapshot_interval::Int=100`: iterations between snapshot writes. Must be
+  `>= 1` when `snapshot_path` is set.
 
 Tag-valued keywords (`loss_function`, `boosting_type`, `eval_metric`) accept
 their value as the tag (e.g. `Losses.RMSE`), the matching string (`"RMSE"`),

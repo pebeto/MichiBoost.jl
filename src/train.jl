@@ -15,8 +15,13 @@ function train(
     eval_metric::Union{Type{<:Metric},AbstractString,Symbol,Nothing}=nothing,
     boosting_type::Union{String,Symbol}="Ordered",
     init_model::Union{MichiBoostModel,Nothing}=nothing,
+    snapshot_path::Union{AbstractString,Nothing}=nothing,
+    snapshot_interval::Int=100,
     kwargs...,
 )
+    if snapshot_path !== nothing && snapshot_interval < 1
+        error("`snapshot_interval` must be >= 1; got $snapshot_interval.")
+    end
     # Normalise Symbol forms once at entry so the downstream `uppercase` / `==`
     # comparisons keep operating on Strings.
     loss_function isa Symbol && (loss_function = String(loss_function))
@@ -282,6 +287,21 @@ function train(
             )
         end
 
+        if snapshot_path !== nothing &&
+            iter != iterations &&
+            iter % snapshot_interval == 0
+            JLD2.save_object(snapshot_path, _build_model(
+                trees, learning_rate, initial_pred, initial_pred_val, encoder,
+                qf.borders, pool.feature_names, n_classes, class_labels_final,
+                is_multiclass, pool.numerical_feature_indices,
+                pool.categorical_feature_indices, length(trees), nothing,
+                is_custom_loss ? loss_function : nothing,
+            ))
+            if verbose
+                println("Snapshot written to $snapshot_path (iteration $iter)")
+            end
+        end
+
         if es_active
             # Extend the running eval predictions with the just-built tree
             # so we only pay O(1) tree-prediction per ES check.
@@ -331,22 +351,22 @@ function train(
     final_best_iteration = es_active ? best_iter : length(trees)
     final_best_score = es_active ? best_eval_value : nothing
 
-    return MichiBoostModel(
-        trees,
-        learning_rate,
-        is_multiclass ? initial_pred : initial_pred_val,
-        encoder,
-        qf.borders,
-        pool.feature_names,
-        n_classes,
-        class_labels_final,
-        is_multiclass,
-        pool.numerical_feature_indices,
-        pool.categorical_feature_indices,
-        final_best_iteration,
-        final_best_score,
+    final_model = _build_model(
+        trees, learning_rate, initial_pred, initial_pred_val, encoder,
+        qf.borders, pool.feature_names, n_classes, class_labels_final,
+        is_multiclass, pool.numerical_feature_indices,
+        pool.categorical_feature_indices, final_best_iteration, final_best_score,
         is_custom_loss ? loss_function : nothing,
     )
+
+    if snapshot_path !== nothing
+        JLD2.save_object(snapshot_path, final_model)
+        if verbose
+            println("Snapshot written to $snapshot_path (final model)")
+        end
+    end
+
+    return final_model
 end
 
 # Helpers extracted from `train` for readability. Pure functions, no shared
@@ -518,6 +538,46 @@ function _setup_eval(
             y_onehot=Matrix{Float64}(undef, 0, 0),
         )
     end
+end
+
+# Assemble a `MichiBoostModel` from the loop-local state. Called three times
+# from `train`: each periodic snapshot during the loop, an optional final
+# snapshot after the loop (covers ES truncation and non-multiple iteration
+# counts), and the returned model. Centralising the 14-field constructor here
+# keeps those three sites in sync.
+function _build_model(
+    trees,
+    learning_rate::Float64,
+    initial_pred::Vector{Float64},
+    initial_pred_val::Float64,
+    encoder,
+    borders,
+    feature_names,
+    n_classes::Int,
+    class_labels,
+    is_multiclass::Bool,
+    numerical_feature_indices,
+    categorical_feature_indices,
+    best_iteration::Int,
+    best_score::Union{Float64,Nothing},
+    custom_loss::Union{LossFunction,Nothing},
+)
+    return MichiBoostModel(
+        trees,
+        learning_rate,
+        is_multiclass ? initial_pred : initial_pred_val,
+        encoder,
+        borders,
+        feature_names,
+        n_classes,
+        class_labels,
+        is_multiclass,
+        numerical_feature_indices,
+        categorical_feature_indices,
+        best_iteration,
+        best_score,
+        custom_loss,
+    )
 end
 
 # Compute raw (pre-link) predictions from `model.trees` on the already-quantized
