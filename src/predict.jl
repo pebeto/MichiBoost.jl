@@ -113,14 +113,11 @@ function feature_importance(model::MichiBoostModel)
 
     total = max(sum(values(importance); init=0.0), 1e-10)
 
-    # Collect all feature names in original column order
-    all_names = model.feature_names
-
     result = Pair{Symbol,Float64}[]
     for (name, imp) in sort(collect(importance); by=x -> -x[2])
         push!(result, name => 100.0 * imp / total)
     end
-    for name in all_names
+    for name in model.feature_names
         haskey(importance, name) || push!(result, name => 0.0)
     end
     return result

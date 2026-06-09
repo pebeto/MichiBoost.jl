@@ -152,10 +152,10 @@ The tables below will be populated after running the suite. Re-run locally to re
 
 |     n |  p | CatBoost | MichiBoost |    Ratio |
 | ----: | -: | -------: | ---------: | -------: |
-|   500 | 10 |  132.8ms |     93.7ms | MB 1.42× |
-|  2000 | 20 |  251.2ms |    169.9ms | MB 1.48× |
-| 10000 | 50 |  613.0ms |    681.5ms | CB 1.11× |
-| 50000 | 50 | 1004.8ms |   1765.2ms | CB 1.76× |
+|   500 | 10 |  141.9ms |     91.4ms | MB 1.55× |
+|  2000 | 20 |  212.1ms |    151.8ms | MB 1.40× |
+| 10000 | 50 |  576.0ms |    576.6ms | CB 1.00× |
+| 50000 | 50 |  954.3ms |   1492.8ms | CB 1.56× |
 
 **Training: Categorical (n=5000, 5 categorical + 5 numerical features)**
 
@@ -182,23 +182,21 @@ Covertype subset: 50,000 samples (40k train / 10k test), 54 features, 7 classes.
 
 | Threads | MichiBoost | MB speedup vs 1t | CatBoost | CB speedup vs 1t |    Ratio |
 | ------: | ---------: | ---------------: | -------: | ---------------: | -------: |
-|       1 |   4711.7ms |            1.00× | 1829.4ms |            1.00× | CB 2.58× |
-|       2 |   2690.2ms |            1.75× | 1036.1ms |            1.77× | CB 2.60× |
-|       4 |   1621.0ms |            2.91× |  650.4ms |            2.81× | CB 2.49× |
-|       8 |   1148.0ms |            4.10× |  517.9ms |            3.53× | CB 2.22× |
+|       1 |   4118.8ms |            1.00× | 1825.4ms |            1.00× | CB 2.26× |
+|       2 |   2308.0ms |            1.78× | 1005.3ms |            1.82× | CB 2.30× |
+|       4 |   1374.1ms |            3.00× |  616.1ms |            2.96× | CB 2.23× |
+|       8 |   1114.6ms |            3.70× |  521.6ms |            3.50× | CB 2.14× |
 
 **Inference time (median ms)**
 
 | Threads | MichiBoost | CatBoost |
 | ------: | ---------: | -------: |
-|       1 |      8.569 |    2.616 |
-|       2 |      7.171 |    2.413 |
-|       4 |      6.465 |    2.450 |
-|       8 |      5.394 |    2.493 |
+|       1 |      8.053 |    2.468 |
+|       2 |      7.152 |    2.487 |
+|       4 |      6.525 |    2.485 |
+|       8 |      5.292 |    2.506 |
 
 ### Feature costs
-
-Fixture: `n_train=1600`, `n_features=20`, default hyperparameters (100 iters, depth 6, learning_rate 0.03).
 
 4 threads. Fixture: `n_train=1600`, `n_features=20`, default hyperparameters (100 iters, depth 6, learning_rate 0.03).
 

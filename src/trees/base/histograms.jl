@@ -442,17 +442,8 @@ function _find_best_split_across_leaves(
         end
     end
 
-    # When `cat_sorted_vals` is empty (no precomputed cut points), each feature
-    # collects its own sorted unique values on the fly. The subtraction trick
-    # is also disabled in that mode, since the per-feature bin set may differ
-    # between parent and child levels.
-    cat_no_precomputed = isempty(cat_sorted_vals)
     Threads.@threads :static for j in sampled_cat
-        sorted_vals = if cat_no_precomputed
-            _collect_cat_vals(leaf_groups, cat_encoded, j)
-        else
-            cat_sorted_vals[j]
-        end
+        sorted_vals = cat_sorted_vals[j]
         nv = length(sorted_vals)
         nv <= 1 && continue
         tid = Threads.threadid()
@@ -460,7 +451,7 @@ function _find_best_split_across_leaves(
         hist_g = cache.cat_hist_g[j]
         hist_h = cache.cat_hist_h[j]
         hist_c = cache.cat_hist_c[j]
-        has_parent = cat_no_precomputed ? false : cache.cat_hist_valid[j]
+        has_parent = cache.cat_hist_valid[j]
         _fill_cat_hist!(
             buf,
             hist_g,
@@ -476,7 +467,7 @@ function _find_best_split_across_leaves(
             has_parent,
             n_samples_level,
         )
-        cache.cat_hist_filled[j] = !cat_no_precomputed
+        cache.cat_hist_filled[j] = true
         gain, b = _sweep_gain(
             hist_g,
             hist_h,
@@ -499,12 +490,4 @@ function _find_best_split_across_leaves(
     end
 
     return argmax(c -> c.gain, thread_bests)
-end
-
-function _collect_cat_vals(leaf_groups, cat_encoded, j)
-    all_vals = Set{Float64}()
-    for group in leaf_groups, idx in group
-        push!(all_vals, cat_encoded[idx, j])
-    end
-    return sort(collect(all_vals))
 end

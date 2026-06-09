@@ -12,12 +12,9 @@ function build_symmetric_tree(
     min_data_in_leaf::Int=1,
     rsm::Float64=1.0,
     rng::AbstractRNG=MersenneTwister(),
-    buffers::Vector{SplitBuffers}=[
-        SplitBuffers(1 << depth, maximum(qf.n_bins; init=1) + 1, length(sample_indices)) for
-        _ in 1:Threads.maxthreadid()
-    ],
-    cat_sorted_vals::Vector{Vector{Float64}}=Vector{Vector{Float64}}(),
-    hist_cache::HistCache=HistCache(1 << depth, qf.n_bins, cat_sorted_vals),
+    buffers::Vector{SplitBuffers},
+    cat_sorted_vals::Vector{Vector{Float64}},
+    hist_cache::HistCache,
     leaf_refine_values::Union{Nothing,AbstractVector{Float64}}=nothing,
     leaf_refine_weights::Union{Nothing,AbstractVector{Float64}}=nothing,
 )

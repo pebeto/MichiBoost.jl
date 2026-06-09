@@ -79,7 +79,6 @@ function train(
     # Categorical encoding. Reuse init_model's encoder when continuing so the
     # encoded values feeding into inherited trees match what those trees saw
     # during their original training.
-    permutation = randperm(rng, n_samples)
     cat_encoded, encoder = if init_model !== nothing
         if n_cat > 0
             init_model.encoder !== nothing || error(
@@ -95,7 +94,9 @@ function train(
         end
     elseif n_cat > 0
         if boosting_type == "Ordered"
-            compute_ordered_target_stats(pool.features_categorical, y, permutation; alpha=1.0)
+            compute_ordered_target_stats(
+                pool.features_categorical, y, randperm(rng, n_samples); alpha=1.0
+            )
         else
             plain_target_encode(pool.features_categorical, y)
         end
@@ -106,7 +107,7 @@ function train(
         )
     end
 
-    lf = is_custom_loss ? loss_function : make_loss(loss_function; n_classes)
+    lf = is_custom_loss ? loss_function : make_loss(loss_function)
 
     # Initial predictions. Both `initial_pred` (multiclass vector) and
     # `initial_pred_val` (binary/regression scalar) are bound so `_setup_eval`
@@ -433,7 +434,6 @@ function _resolve_task(loss_function, label, original_class_labels, n_samples::I
     return (;
         loss_function,
         is_custom_loss,
-        is_classification,
         is_multiclass,
         n_classes,
         y,

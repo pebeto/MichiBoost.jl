@@ -1,4 +1,4 @@
-using MichiBoost: MichiBoost, Pool, MichiBoostRegressor
+using MichiBoost: MichiBoost, MichiBoostRegressor
 using Test
 
 @testset "Regression training and prediction" begin

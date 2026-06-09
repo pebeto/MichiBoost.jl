@@ -1,7 +1,7 @@
 module MichiBoost
 
 using CategoricalArrays: CategoricalValue, unwrap
-using Random: AbstractRNG, MersenneTwister, Random, randperm, shuffle!
+using Random: AbstractRNG, MersenneTwister, randperm, shuffle!
 using JLD2: JLD2
 using StatisticalMeasures: StatisticalMeasures
 using Statistics: mean, median

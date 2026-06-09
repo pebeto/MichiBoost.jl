@@ -1,6 +1,5 @@
 using MichiBoost
 using Random
-using Statistics
 using Test
 
 @testset "init_model — regression continuation matches single fit" begin

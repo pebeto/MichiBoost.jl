@@ -62,14 +62,6 @@ _resolve_metric(name::Symbol) = _resolve_metric(String(name))
 # `y_eval` shape matches `loss(...)`: a Vector for binary/regression, a one-hot
 # Matrix for multiclass. `raw_pred` is the running raw prediction (logits for
 # classification, values for regression).
-function _eval_metric(name::AbstractString, is_multiclass::Bool, n_classes::Int)
-    return _eval_metric(_resolve_metric(name), is_multiclass, n_classes)
-end
-
-function _eval_metric(name::Symbol, is_multiclass::Bool, n_classes::Int)
-    return _eval_metric(_resolve_metric(name), is_multiclass, n_classes)
-end
-
 function _eval_metric(::Type{Metrics.RMSE}, is_multiclass::Bool, n_classes::Int)
     (is_multiclass || n_classes == 2) &&
         error("`Metrics.RMSE` is only valid for regression")
@@ -95,8 +87,7 @@ end
 function _eval_metric(::Type{Metrics.MultiLogloss}, is_multiclass::Bool, n_classes::Int)
     is_multiclass ||
         error("`Metrics.MultiLogloss` is only valid for multi-class classification")
-    return :minimize,
-    (y_onehot, logits) -> loss(MultiClassLoss(n_classes), y_onehot, logits)
+    return :minimize, (y_onehot, logits) -> loss(MultiClassLoss(), y_onehot, logits)
 end
 
 function _eval_metric(::Type{Metrics.Accuracy}, is_multiclass::Bool, n_classes::Int)

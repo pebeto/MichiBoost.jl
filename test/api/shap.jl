@@ -1,4 +1,4 @@
-using MichiBoost: MichiBoost, Pool, MichiBoostRegressor, MichiBoostClassifier, shap_values
+using MichiBoost: MichiBoost, MichiBoostRegressor, MichiBoostClassifier, shap_values
 using Random
 using Test
 

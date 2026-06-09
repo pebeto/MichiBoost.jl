@@ -341,16 +341,7 @@ function predict_classes end  # Actual method is on MichiBoostModel in predict.j
 function _staged_predict_raw(model::MichiBoostModel, pool::Pool)
     n = pool.n_samples
     n_iter = length(model.trees)
-    num_bins = if n_numerical(pool) > 0
-        apply_borders(pool.features_numerical, model.borders)
-    else
-        Matrix{UInt16}(undef, n, 0)
-    end
-    cat_enc = if n_categorical(pool) > 0 && model.encoder !== nothing
-        encode_categorical(model.encoder, pool.features_categorical)
-    else
-        Matrix{Float64}(undef, n, 0)
-    end
+    num_bins, cat_enc = _prepare_features(model, pool)
     leaf_buf = Vector{Int}(undef, n)
 
     if model.is_multiclass
@@ -562,16 +553,7 @@ end
 
 function _predict_raw(model::MichiBoostModel, pool::Pool)
     n = pool.n_samples
-    num_bins = if n_numerical(pool) > 0
-        apply_borders(pool.features_numerical, model.borders)
-    else
-        Matrix{UInt16}(undef, n, 0)
-    end
-    cat_enc = if n_categorical(pool) > 0 && model.encoder !== nothing
-        encode_categorical(model.encoder, pool.features_categorical)
-    else
-        Matrix{Float64}(undef, n, 0)
-    end
+    num_bins, cat_enc = _prepare_features(model, pool)
     trees = model.trees
     lr = model.learning_rate
     nt = Threads.nthreads()
@@ -864,7 +846,7 @@ function _kfold_folds(n::Int, fold_count::Int, shuffle::Bool, rng::AbstractRNG)
     for k in 1:fold_count
         ts = (k - 1) * fold_size + 1
         te = k == fold_count ? n : k * fold_size
-        folds[k] = collect(indices[ts:te])
+        folds[k] = indices[ts:te]
     end
     return folds
 end

@@ -6,28 +6,6 @@ function Pool(
     feature_names=nothing,
     weight=nothing,
 )
-    return _build_pool(data; label, cat_features, text_features, feature_names, weight)
-end
-
-function Pool(;
-    data,
-    label=nothing,
-    cat_features=nothing,
-    text_features=nothing,
-    feature_names=nothing,
-    weight=nothing,
-)
-    return _build_pool(data; label, cat_features, text_features, feature_names, weight)
-end
-
-function _build_pool(
-    data;
-    label=nothing,
-    cat_features=nothing,
-    text_features=nothing,
-    feature_names=nothing,
-    weight=nothing,
-)
     if Tables.istable(data)
         ct = Tables.columntable(data)
         col_names = collect(Tables.columnnames(ct))

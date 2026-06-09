@@ -1,4 +1,4 @@
-using MichiBoost: MichiBoost, Pool, MichiBoostClassifier, predict_proba
+using MichiBoost: MichiBoost, MichiBoostClassifier, predict_proba
 using Random
 using Test
 

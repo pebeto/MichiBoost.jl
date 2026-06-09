@@ -167,16 +167,14 @@ function gradient_hessian!(
     return nothing
 end
 
-function make_loss(name::AbstractString; n_classes::Int=2)
+function make_loss(name::AbstractString)
     upper = uppercase(name)
     upper == "RMSE" && return RMSELoss()
     upper == "MAE" && return MAELoss()
     upper in ("LOGLOSS", "CROSSENTROPY") && return LoglossLoss()
-    upper in ("MULTICLASS", "MULTILOGLOSS") && return MultiClassLoss(n_classes)
+    upper in ("MULTICLASS", "MULTILOGLOSS") && return MultiClassLoss()
     return error("Unknown loss function: $name. Supported: RMSE, MAE, Logloss, MultiClass")
 end
-
-make_loss(name::Symbol; kwargs...) = make_loss(String(name); kwargs...)
 
 """
     MichiBoost.Losses
@@ -207,8 +205,8 @@ end  # module Losses
 
 using .Losses: LossKind
 
-# Canonical string name for each `Losses.*` tag, used to forward into the
-# existing string-keyed `make_loss` dispatcher without further refactoring.
+# Canonical string name for each `Losses.*` tag, consumed by the string-keyed
+# `make_loss` dispatcher.
 _loss_name(::Type{Losses.RMSE}) = "RMSE"
 _loss_name(::Type{Losses.MAE}) = "MAE"
 _loss_name(::Type{Losses.Logloss}) = "Logloss"

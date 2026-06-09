@@ -485,16 +485,8 @@ function _find_best_split_across_leaves_mc(
         end
     end
 
-    # See base/histograms.jl for the rationale: empty `cat_sorted_vals` means
-    # per-feature on-the-fly cut points, which disables the subtraction trick
-    # and the parent-validity cache.
-    cat_no_precomputed = isempty(cat_sorted_vals)
     Threads.@threads :dynamic for j in sampled_cat
-        sorted_vals = if cat_no_precomputed
-            _collect_cat_vals(leaf_groups, cat_encoded, j)
-        else
-            cat_sorted_vals[j]
-        end
+        sorted_vals = cat_sorted_vals[j]
         nv = length(sorted_vals)
         nv <= 1 && continue
         tid = Threads.threadid()
@@ -502,7 +494,7 @@ function _find_best_split_across_leaves_mc(
         hist_g = cache.cat_hist_g[j]
         hist_h = cache.cat_hist_h[j]
         hist_c = cache.cat_hist_c[j]
-        has_parent = cat_no_precomputed ? false : cache.cat_hist_valid[j]
+        has_parent = cache.cat_hist_valid[j]
         _fill_cat_hist_mc!(
             buf,
             hist_g,
@@ -519,7 +511,7 @@ function _find_best_split_across_leaves_mc(
             has_parent,
             n_samples_level,
         )
-        cache.cat_hist_filled[j] = !cat_no_precomputed
+        cache.cat_hist_filled[j] = true
         gain, b = _sweep_gain_mc(
             hist_g,
             hist_h,

@@ -7,7 +7,7 @@ using Statistics
 using Test
 
 @testset "eval_metric: regression dispatch" begin
-    o, fn = _eval_metric("RMSE", false, 0)
+    o, fn = _eval_metric(Metrics.RMSE, false, 0)
     @test o == :minimize
     @test isapprox(
         fn([1.0, 2.0, 3.0], [1.1, 1.9, 3.2]),
@@ -15,13 +15,13 @@ using Test
         atol=1e-12,
     )
 
-    o, fn = _eval_metric("MAE", false, 0)
+    o, fn = _eval_metric(Metrics.MAE, false, 0)
     @test o == :minimize
     @test isapprox(
         fn([1.0, 2.0, 3.0], [1.1, 1.9, 3.2]), mean(abs.([0.1, -0.1, 0.2])); atol=1e-12
     )
 
-    o, fn = _eval_metric("R2", false, 0)
+    o, fn = _eval_metric(Metrics.R2, false, 0)
     @test o == :maximize
     @test fn([1.0, 2.0, 3.0], [1.0, 2.0, 3.0]) ≈ 1.0
 end
@@ -63,12 +63,6 @@ end
         1.0 0.0 0.5
     ]
     @test _mc_accuracy(y_onehot, logits) == 2 / 3
-end
-
-@testset "eval_metric: unknown metric errors" begin
-    @test_throws ErrorException _eval_metric("Magic", false, 0)
-    @test_throws ErrorException _eval_metric("Magic", false, 2)
-    @test_throws ErrorException _eval_metric("Magic", true, 3)
 end
 
 @testset "eval_metric: AUC drives early stopping (binary)" begin
@@ -116,12 +110,9 @@ end
     @test length(reg.model.trees) >= 1
 end
 
-@testset "Metrics: typed dispatch matches string dispatch" begin
-    # Same orientation/value from `Metrics.*` and the equivalent string.
-    o_t, fn_t = _eval_metric(Metrics.RMSE, false, 0)
-    o_s, fn_s = _eval_metric("RMSE", false, 0)
-    @test o_t == o_s == :minimize
-    @test fn_t([1.0, 2.0], [1.1, 1.9]) == fn_s([1.0, 2.0], [1.1, 1.9])
+@testset "Metrics: orientation per metric" begin
+    o_t, _ = _eval_metric(Metrics.RMSE, false, 0)
+    @test o_t == :minimize
 
     o_t, _ = _eval_metric(Metrics.AUC, false, 2)
     @test o_t == :maximize

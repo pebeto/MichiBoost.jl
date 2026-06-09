@@ -48,9 +48,7 @@ struct MAELoss <: LossFunction end
 
 struct LoglossLoss <: LossFunction end
 
-struct MultiClassLoss <: LossFunction
-    n_classes::Int
-end
+struct MultiClassLoss <: LossFunction end
 
 """
     Pool(data; label=nothing, cat_features=nothing, text_features=nothing,

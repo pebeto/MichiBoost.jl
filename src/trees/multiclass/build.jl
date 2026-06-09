@@ -13,13 +13,9 @@ function build_symmetric_tree(
     min_data_in_leaf::Int=1,
     rsm::Float64=1.0,
     rng::AbstractRNG=MersenneTwister(),
-    buffers::Vector{SplitBuffersMC}=[
-        SplitBuffersMC(
-            1 << depth, maximum(qf.n_bins; init=1) + 1, n_classes, length(sample_indices)
-        ) for _ in 1:Threads.maxthreadid()
-    ],
-    cat_sorted_vals::Vector{Vector{Float64}}=Vector{Vector{Float64}}(),
-    hist_cache::HistCacheMC=HistCacheMC(1 << depth, qf.n_bins, cat_sorted_vals, n_classes),
+    buffers::Vector{SplitBuffersMC},
+    cat_sorted_vals::Vector{Vector{Float64}},
+    hist_cache::HistCacheMC,
 )
     n_features = n_num + n_cat
     n_sampled = max(1, round(Int, rsm * n_features))
