@@ -145,7 +145,13 @@ end
     n = 200
     cats = rand(["a", "b", "c"], n)
     nums = randn(n, 2)
-    y = Float64.([c == "a" ? 0 : c == "b" ? 1 : 0 for c in cats]) .+ 0.1 .* randn(n)
+    y = Float64.([if c == "a"
+        0
+    elseif c == "b"
+        1
+    else
+        0
+    end for c in cats]) .+ 0.1 .* randn(n)
 
     pool = Pool(hcat(cats, nums); cat_features=[1], label=y)
 

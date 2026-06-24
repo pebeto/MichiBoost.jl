@@ -49,6 +49,36 @@ rmse = sqrt(mean((predictions .- y_test) .^ 2))
 println("Test RMSE: $rmse")
 ```
 
+## Choosing a Loss
+
+RMSE fits the conditional mean and suits clean, symmetric targets. The
+parametrized losses below cover the cases where RMSE falls short. Pass an
+instance to `loss_function`.
+
+| Loss | Use it when |
+|---|---|
+| `Huber(δ)` | Outliers distort an RMSE fit. Squared error within `δ`, linear past it. |
+| `Quantile(α)` | You need a prediction interval or an asymmetric over/under penalty. Fits the `α`-quantile. |
+| `Expectile(α)` | Same asymmetry as `Quantile` but with squared error, so the fit stays smooth. |
+| `MAPE()` | Relative error matters more than absolute. Targets must be non-zero. |
+| `Tweedie(p)` | Non-negative, right-skewed targets with a spike at zero (claims, demand). Predicts on a log scale. |
+| `LogLinQuantile(α)` | Quantiles of positive targets that span orders of magnitude. |
+
+```julia
+# 90th-percentile fit for an upper prediction bound.
+upper = MichiBoostRegressor(; iterations=500, loss_function=Quantile(0.9))
+fit!(upper, X_train, y_train)
+
+# Outlier-robust fit.
+robust = MichiBoostRegressor(; iterations=500, loss_function=Huber(1.0))
+fit!(robust, X_train, y_train)
+```
+
+`Tweedie` and `LogLinQuantile` predict on a log scale; [`predict`](@ref)
+exponentiates the result, so the values it returns are on the original target
+scale. Each loss is documented in the [Models](@ref) API reference. To write
+your own, see [Custom Loss Functions](@ref).
+
 ## Early Stopping
 
 Pass an `eval_set` and an `early_stopping_rounds` count to halt training once

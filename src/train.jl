@@ -120,9 +120,7 @@ function train(
         else
             initial_pred_val = init_model.initial_pred::Float64
         end
-        predictions = _predict_raw_for_init(
-            init_model, qf.bins, cat_encoded, learning_rate
-        )
+        predictions = _predict_raw_for_init(init_model, qf.bins, cat_encoded, learning_rate)
     elseif is_multiclass
         initial_pred = initial_prediction(lf, y_onehot)
         predictions = repeat(initial_pred', n_samples, 1)
@@ -208,8 +206,14 @@ function train(
     grads_buf = bufs.g
     hess_buf = bufs.h
     scratch_buf = bufs.scratch
-    use_refine = lf isa MAELoss
-    refine_buf = use_refine ? Vector{Float64}(undef, n_samples) : Float64[]
+    # Losses with a zero Hessian (MAE, the quantile family) override Newton leaf
+    # values with a weighted-quantile refinement. `leaf_refine_targets!` fills
+    # the per-sample value and weight each round; `leaf_refine_value` reduces
+    # each leaf. See uses_leaf_refinement / leaf_refine_* in losses.jl.
+    use_refine = uses_leaf_refinement(lf)
+    refine_vals = use_refine ? Vector{Float64}(undef, n_samples) : Float64[]
+    refine_ws = use_refine ? Vector{Float64}(undef, n_samples) : Float64[]
+    leaf_reduce = use_refine ? ((v, w) -> leaf_refine_value(lf, v, w)) : nothing
 
     for iter in 1:iterations
         if is_multiclass
@@ -243,12 +247,12 @@ function train(
             gradient_hessian!(grads_buf, hess_buf, lf, y, predictions, scratch_buf)
             grads_buf .*= weights
             hess_buf .*= weights
-            # MAE is non-smooth: surrogate gradients (±1) drive split-finding,
-            # but leaf values must come from the residual weighted median.
-            # Without this, each round shifts predictions by at most
-            # learning_rate × 1, causing severe underfitting.
+            # Non-smooth losses: the surrogate gradient drives split-finding,
+            # but leaf values must come from the residual quantile. Without this
+            # each round shifts predictions by at most learning_rate × g,
+            # causing severe underfitting.
             if use_refine
-                refine_buf .= y .- predictions
+                leaf_refine_targets!(refine_vals, refine_ws, lf, y, predictions, weights)
             end
             tree = build_symmetric_tree(
                 grads_buf,
@@ -267,8 +271,9 @@ function train(
                 buffers=buffers::Vector{SplitBuffers},
                 cat_sorted_vals,
                 hist_cache=hist_cache::HistCache,
-                leaf_refine_values=use_refine ? refine_buf : nothing,
-                leaf_refine_weights=use_refine ? weights : nothing,
+                leaf_refine_values=use_refine ? refine_vals : nothing,
+                leaf_refine_weights=use_refine ? refine_ws : nothing,
+                leaf_reduce,
             )
             push!(trees, tree)
             predict_tree!(
@@ -288,16 +293,27 @@ function train(
             )
         end
 
-        if snapshot_path !== nothing &&
-            iter != iterations &&
-            iter % snapshot_interval == 0
-            JLD2.save_object(snapshot_path, _build_model(
-                trees, learning_rate, initial_pred, initial_pred_val, encoder,
-                qf.borders, pool.feature_names, n_classes, class_labels_final,
-                is_multiclass, pool.numerical_feature_indices,
-                pool.categorical_feature_indices, length(trees), nothing,
-                is_custom_loss ? loss_function : nothing,
-            ))
+        if snapshot_path !== nothing && iter != iterations && iter % snapshot_interval == 0
+            JLD2.save_object(
+                snapshot_path,
+                _build_model(
+                    trees,
+                    learning_rate,
+                    initial_pred,
+                    initial_pred_val,
+                    encoder,
+                    qf.borders,
+                    pool.feature_names,
+                    n_classes,
+                    class_labels_final,
+                    is_multiclass,
+                    pool.numerical_feature_indices,
+                    pool.categorical_feature_indices,
+                    length(trees),
+                    nothing,
+                    is_custom_loss ? loss_function : nothing,
+                ),
+            )
             if verbose
                 println("Snapshot written to $snapshot_path (iteration $iter)")
             end
@@ -353,10 +369,20 @@ function train(
     final_best_score = es_active ? best_eval_value : nothing
 
     final_model = _build_model(
-        trees, learning_rate, initial_pred, initial_pred_val, encoder,
-        qf.borders, pool.feature_names, n_classes, class_labels_final,
-        is_multiclass, pool.numerical_feature_indices,
-        pool.categorical_feature_indices, final_best_iteration, final_best_score,
+        trees,
+        learning_rate,
+        initial_pred,
+        initial_pred_val,
+        encoder,
+        qf.borders,
+        pool.feature_names,
+        n_classes,
+        class_labels_final,
+        is_multiclass,
+        pool.numerical_feature_indices,
+        pool.categorical_feature_indices,
+        final_best_iteration,
+        final_best_score,
         is_custom_loss ? loss_function : nothing,
     )
 

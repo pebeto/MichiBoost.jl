@@ -17,6 +17,7 @@ function build_symmetric_tree(
     hist_cache::HistCache,
     leaf_refine_values::Union{Nothing,AbstractVector{Float64}}=nothing,
     leaf_refine_weights::Union{Nothing,AbstractVector{Float64}}=nothing,
+    leaf_reduce::Union{Nothing,Function}=nothing,
 )
     n_features = n_num + n_cat
     n_sampled = max(1, round(Int, rsm * n_features))
@@ -74,7 +75,7 @@ function build_symmetric_tree(
             leaf_values[l] = 0.0
         elseif refine
             leaf_values[l] = _leaf_value_refine(
-                group, leaf_refine_values, leaf_refine_weights
+                group, leaf_refine_values, leaf_refine_weights, leaf_reduce
             )
         else
             leaf_values[l] = _leaf_value_newton(group, gradients, hessians, l2_leaf_reg)
@@ -98,7 +99,7 @@ end
     return g_sum / (h_sum + l2_leaf_reg)
 end
 
-@inline function _leaf_value_refine(group, leaf_refine_values, leaf_refine_weights)
+@inline function _leaf_value_refine(group, leaf_refine_values, leaf_refine_weights, reduce)
     n_leaf = length(group)
     local_vals = Vector{Float64}(undef, n_leaf)
     local_ws = Vector{Float64}(undef, n_leaf)
@@ -107,7 +108,11 @@ end
         local_vals[j] = leaf_refine_values[idx]
         local_ws[j] = leaf_refine_weights === nothing ? 1.0 : leaf_refine_weights[idx]
     end
-    return weighted_median(local_vals, local_ws)
+    return if reduce === nothing
+        weighted_median(local_vals, local_ws)
+    else
+        reduce(local_vals, local_ws)
+    end
 end
 
 # Shared utility used by both build_symmetric_tree and build_symmetric_tree_multiclass

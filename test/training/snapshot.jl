@@ -57,9 +57,7 @@ end
     )
     fit!(base, X, y)
 
-    full = MichiBoostRegressor(;
-        iterations=20, depth=2, learning_rate=0.1, verbose=false
-    )
+    full = MichiBoostRegressor(; iterations=20, depth=2, learning_rate=0.1, verbose=false)
     fit!(full, X, y)
 
     try
@@ -114,11 +112,7 @@ end
     snapfile = tempname() * ".jld2"
 
     model = MichiBoostRegressor(;
-        iterations=5,
-        depth=2,
-        verbose=false,
-        snapshot_path=snapfile,
-        snapshot_interval=1,
+        iterations=5, depth=2, verbose=false, snapshot_path=snapfile, snapshot_interval=1
     )
     fit!(model, X, y)
     try
@@ -138,11 +132,7 @@ end
     snapfile = tempname() * ".jld2"
 
     model = MichiBoostRegressor(;
-        iterations=13,
-        depth=2,
-        verbose=false,
-        snapshot_path=snapfile,
-        snapshot_interval=5,
+        iterations=13, depth=2, verbose=false, snapshot_path=snapfile, snapshot_interval=5
     )
     fit!(model, X, y)
     try
@@ -160,11 +150,7 @@ end
     snapfile = tempname() * ".jld2"
 
     clf = MichiBoostClassifier(;
-        iterations=12,
-        depth=3,
-        verbose=false,
-        snapshot_path=snapfile,
-        snapshot_interval=4,
+        iterations=12, depth=3, verbose=false, snapshot_path=snapfile, snapshot_interval=4
     )
     fit!(clf, X, y)
     try
@@ -186,11 +172,7 @@ end
     snapfile = tempname() * ".jld2"
 
     clf = MichiBoostClassifier(;
-        iterations=10,
-        depth=2,
-        verbose=false,
-        snapshot_path=snapfile,
-        snapshot_interval=5,
+        iterations=10, depth=2, verbose=false, snapshot_path=snapfile, snapshot_interval=5
     )
     fit!(clf, X, y)
     try
@@ -209,11 +191,7 @@ end
     snapfile = tempname() * ".jld2"
 
     model = MichiBoostRegressor(;
-        iterations=5,
-        depth=2,
-        verbose=false,
-        snapshot_path=snapfile,
-        snapshot_interval=0,
+        iterations=5, depth=2, verbose=false, snapshot_path=snapfile, snapshot_interval=0
     )
     @test_throws ErrorException fit!(model, X, y)
 end
@@ -224,11 +202,7 @@ end
     snapfile = tempname() * ".jld2"
 
     model = MichiBoostRegressor(;
-        iterations=5,
-        depth=2,
-        verbose=false,
-        snapshot_path=snapfile,
-        snapshot_interval=-5,
+        iterations=5, depth=2, verbose=false, snapshot_path=snapfile, snapshot_interval=-5
     )
     @test_throws ErrorException fit!(model, X, y)
 end

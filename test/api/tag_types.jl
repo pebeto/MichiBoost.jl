@@ -45,9 +45,8 @@ end
     @test _to_string(
         :Balanced, AutoClassWeightMode, _auto_class_weight_name, "auto_class_weights"
     ) == "Balanced"
-    @test _to_string(
-        :Probability, PredictionType, _prediction_name, "prediction_type"
-    ) == "Probability"
+    @test _to_string(:Probability, PredictionType, _prediction_name, "prediction_type") ==
+        "Probability"
 end
 
 @testset "_to_string: rejects wrong types" begin

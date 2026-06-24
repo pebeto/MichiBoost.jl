@@ -392,7 +392,12 @@ function staged_predict(
     raw = _staged_predict_raw(m.model, pool)
 
     pt == "RawFormulaVal" && return raw
-    m isa MichiBoostClassifier || return raw   # regression: raw == values
+    if !(m isa MichiBoostClassifier)
+        # Regression: raw scores are the predictions, except a custom loss may
+        # apply a link (e.g. exp for Tweedie / LogLinQuantile).
+        cl = m.model.custom_loss
+        return cl !== nothing ? link_inverse(cl, raw) : raw
+    end
 
     model = m.model
     if model.is_multiclass
