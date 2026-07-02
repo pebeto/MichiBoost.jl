@@ -35,6 +35,13 @@ Expectile
 MAPE
 Tweedie
 LogLinQuantile
+RMSEWithUncertainty
+```
+
+## Built-in Classification Losses
+
+```@docs
+MultiClassOneVsAll
 ```
 
 ## Custom Losses

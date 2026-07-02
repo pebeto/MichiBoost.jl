@@ -60,10 +60,22 @@ function train(
     loss_function = task.loss_function
     is_custom_loss = task.is_custom_loss
     is_multiclass = task.is_multiclass
+    is_multitarget = task.is_multitarget
     n_classes = task.n_classes
     y = task.y
     y_onehot = task.y_onehot
     class_labels_final = task.class_labels_final
+
+    # The target handed to the matrix-output gradient/loss calls: the one-hot
+    # matrix for multiclass, the raw vector for a `:multitarget` regression loss.
+    mc_target = is_multitarget ? y : y_onehot
+
+    if is_multitarget && eval_metric !== nothing
+        error(
+            "`eval_metric` is not supported with a `:multitarget` loss; early " *
+            "stopping uses the loss itself.",
+        )
+    end
 
     if init_model !== nothing
         init_model.is_multiclass == is_multiclass || error(
@@ -122,7 +134,7 @@ function train(
         end
         predictions = _predict_raw_for_init(init_model, qf.bins, cat_encoded, learning_rate)
     elseif is_multiclass
-        initial_pred = initial_prediction(lf, y_onehot)
+        initial_pred = initial_prediction(lf, mc_target)
         predictions = repeat(initial_pred', n_samples, 1)
     else
         initial_pred_val = initial_prediction(lf, y)
@@ -191,6 +203,7 @@ function train(
         qf.borders,
         encoder,
         is_multiclass,
+        is_multitarget,
         n_classes,
         initial_pred,
         initial_pred_val,
@@ -217,7 +230,7 @@ function train(
 
     for iter in 1:iterations
         if is_multiclass
-            gradient_hessian!(grads_buf, hess_buf, lf, y_onehot, predictions, scratch_buf)
+            gradient_hessian!(grads_buf, hess_buf, lf, mc_target, predictions, scratch_buf)
             grads_buf .*= weights
             hess_buf .*= weights
             tree = build_symmetric_tree(
@@ -284,7 +297,7 @@ function train(
         if verbose &&
             (iter % max(1, iterations ÷ 10) == 0 || iter == 1 || iter == iterations)
             train_loss = if is_multiclass
-                loss(lf, y_onehot, predictions)
+                loss(lf, mc_target, predictions)
             else
                 loss(lf, y, predictions)
             end
@@ -331,7 +344,8 @@ function train(
                     learning_rate,
                     eval_state.leaf_indices,
                 )
-                es_metric_fn(eval_state.y_onehot, eval_state.preds_mat)
+                es_target = is_multitarget ? eval_state.y_vec : eval_state.y_onehot
+                es_metric_fn(es_target, eval_state.preds_mat)
             else
                 predict_tree!(
                     eval_state.preds_vec,
@@ -407,13 +421,17 @@ end
 function _resolve_task(loss_function, label, original_class_labels, n_samples::Int)
     is_custom_loss = loss_function isa LossFunction
     custom_task = is_custom_loss ? task_type(loss_function) : nothing
+    # `:multitarget` (e.g. RMSEWithUncertainty) is a matrix-output regression
+    # task: it reuses the multiclass tree machinery but keeps `y` as the raw
+    # target instead of one-hot encoding it.
+    is_multitarget = custom_task === :multitarget
     is_classification = if is_custom_loss
         custom_task === :binary || custom_task === :multiclass
     else
         uppercase(loss_function) in ("LOGLOSS", "CROSSENTROPY", "MULTICLASS", "MULTILOGLOSS")
     end
     is_multiclass = if is_custom_loss
-        custom_task === :multiclass
+        custom_task === :multiclass || is_multitarget
     else
         uppercase(loss_function) in ("MULTICLASS", "MULTILOGLOSS")
     end
@@ -441,7 +459,10 @@ function _resolve_task(loss_function, label, original_class_labels, n_samples::I
     end
 
     y_onehot = Matrix{Float64}(undef, 0, 0)
-    n_classes = if is_multiclass
+    n_classes = if is_multitarget
+        # Fixed by the loss; `y` stays the raw target, no one-hot.
+        n_outputs(loss_function)::Int
+    elseif is_multiclass
         class_labels = sort(unique(label))
         nc = length(class_labels)
         label_map = Dict(class_labels[i] => i for i in eachindex(class_labels))
@@ -461,6 +482,7 @@ function _resolve_task(loss_function, label, original_class_labels, n_samples::I
         loss_function,
         is_custom_loss,
         is_multiclass,
+        is_multitarget,
         n_classes,
         y,
         y_onehot,
@@ -495,6 +517,7 @@ function _setup_eval(
     borders,
     encoder,
     is_multiclass::Bool,
+    is_multitarget::Bool,
     n_classes::Int,
     initial_pred::Vector{Float64},
     initial_pred_val::Float64,
@@ -527,7 +550,24 @@ function _setup_eval(
     leaf_indices = Vector{Int}(undef, n_eval)
     y_raw = get_label(eval_pool)
 
-    if is_multiclass
+    if is_multitarget
+        # Matrix-output regression: keep the raw eval target in `y_vec`; the ES
+        # loop feeds it straight to the loss against `preds_mat`.
+        preds_mat = if init_model !== nothing
+            _predict_raw_for_init(init_model, num_bins, cat_enc, learning_rate)
+        else
+            repeat(initial_pred', n_eval, 1)
+        end
+        return (
+            num_bins=num_bins,
+            cat_enc=cat_enc,
+            leaf_indices=leaf_indices,
+            preds_vec=Float64[],
+            preds_mat=preds_mat,
+            y_vec=y_raw,
+            y_onehot=Matrix{Float64}(undef, 0, 0),
+        )
+    elseif is_multiclass
         preds_mat = if init_model !== nothing
             _predict_raw_for_init(init_model, num_bins, cat_enc, learning_rate)
         else

@@ -78,6 +78,11 @@ link_inverse(::LossFunction, raw) = raw
 # per-leaf reducer). The engine then overrides each leaf's Newton value.
 uses_leaf_refinement(::LossFunction) = false
 
+# Number of per-sample outputs for a matrix-output loss. `nothing` lets the
+# engine derive it (the class count for `:multiclass`); a `:multitarget` loss
+# fixes it here.
+n_outputs(::LossFunction) = nothing
+
 task_type(::RMSELoss) = :regression
 task_type(::MAELoss) = :regression
 task_type(::LoglossLoss) = :binary
@@ -503,6 +508,102 @@ function leaf_refine_targets!(vals, ws, ::LogLinQuantile, y, pred, weights)
 end
 function leaf_refine_value(lf::LogLinQuantile, vals, ws)
     return log(max(weighted_quantile(vals, ws, lf.alpha), 1e-8))
+end
+
+"""
+    MultiClassOneVsAll()
+
+Multi-class loss that fits one independent binary logistic problem per class,
+the one-vs-all alternative to softmax `MultiClass`. Each class is scored on its
+own, so it copes better with heavily unbalanced classes. [`predict_proba`](@ref)
+returns per-class sigmoids normalized to sum to 1. Pass as
+`loss_function=MultiClassOneVsAll()` to a [`MichiBoostClassifier`](@ref).
+"""
+struct MultiClassOneVsAll <: LossFunction end
+
+task_type(::MultiClassOneVsAll) = :multiclass
+
+function gradient_hessian!(
+    g::AbstractMatrix,
+    h::AbstractMatrix,
+    ::MultiClassOneVsAll,
+    y_onehot::AbstractMatrix,
+    pred::AbstractMatrix,
+    scratch::AbstractMatrix,
+)
+    scratch .= 1.0 ./ (1.0 .+ exp.(.-pred))
+    g .= y_onehot .- scratch
+    h .= scratch .* (1.0 .- scratch)
+    return nothing
+end
+
+function initial_prediction(::MultiClassOneVsAll, y_onehot::AbstractMatrix)
+    p = clamp.(vec(mean(y_onehot; dims=1)), 1e-7, 1.0 - 1e-7)
+    return log.(p ./ (1.0 .- p))
+end
+
+function link_inverse(::MultiClassOneVsAll, raw::AbstractMatrix)
+    s = 1.0 ./ (1.0 .+ exp.(.-raw))
+    return s ./ sum(s; dims=2)
+end
+
+function loss(::MultiClassOneVsAll, y_onehot::AbstractMatrix, pred::AbstractMatrix)
+    s = clamp.(1.0 ./ (1.0 .+ exp.(.-pred)), 1e-15, 1.0 - 1e-15)
+    return -mean(sum(y_onehot .* log.(s) .+ (1.0 .- y_onehot) .* log.(1.0 .- s); dims=2))
+end
+
+"""
+    RMSEWithUncertainty()
+
+Probabilistic regression loss. Each tree predicts two outputs per sample, the
+mean and the log standard deviation, fit by Gaussian negative log-likelihood.
+[`predict`](@ref) returns an `(n_samples, 2)` matrix of `[mean, std]`. Pass as
+`loss_function=RMSEWithUncertainty()` to a [`MichiBoostRegressor`](@ref).
+
+`staged_predict`, `score`, and a custom `eval_metric` are not supported with
+this loss; early stopping uses the loss itself.
+"""
+struct RMSEWithUncertainty <: LossFunction end
+
+task_type(::RMSEWithUncertainty) = :multitarget
+n_outputs(::RMSEWithUncertainty) = 2
+
+function gradient_hessian!(
+    g::AbstractMatrix,
+    h::AbstractMatrix,
+    ::RMSEWithUncertainty,
+    y::AbstractVector,
+    pred::AbstractMatrix,
+    _scratch,
+)
+    @inbounds for i in eachindex(y)
+        r = y[i] - pred[i, 1]
+        prec = min(exp(-2.0 * pred[i, 2]), 1e8)   # 1 / variance, clamped
+        g[i, 1] = r * prec
+        g[i, 2] = r * r * prec - 1.0
+        h[i, 1] = max(prec, 1e-6)
+        h[i, 2] = max(2.0 * r * r * prec, 1e-6)
+    end
+    return nothing
+end
+
+function initial_prediction(::RMSEWithUncertainty, y::AbstractVector)
+    return [mean(y), log(max(std(y), 1e-3))]
+end
+
+function link_inverse(::RMSEWithUncertainty, raw::AbstractMatrix)
+    return hcat(raw[:, 1], exp.(raw[:, 2]))
+end
+
+function loss(::RMSEWithUncertainty, y::AbstractVector, pred::AbstractMatrix)
+    c = 0.5 * log(2π)
+    acc = 0.0
+    @inbounds for i in eachindex(y)
+        r = y[i] - pred[i, 1]
+        prec = min(exp(-2.0 * pred[i, 2]), 1e8)
+        acc += pred[i, 2] + 0.5 * r * r * prec + c
+    end
+    return acc / length(y)
 end
 
 function make_loss(name::AbstractString)

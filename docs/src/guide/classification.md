@@ -62,6 +62,17 @@ classes = predict(model, X_test)
 # probabilities[i, :] sums to 1.0 for each sample i
 ```
 
+### One-vs-All
+
+The default multi-class loss is softmax. Pass `MultiClassOneVsAll()` to fit one
+independent binary problem per class instead, which often does better on
+heavily unbalanced classes. `predict_proba` still returns rows that sum to 1.
+
+```julia
+model = MichiBoostClassifier(; iterations=200, loss_function=MultiClassOneVsAll())
+fit!(model, X, y)
+```
+
 ## Complete Binary Classification Example
 
 ```julia

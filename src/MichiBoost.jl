@@ -4,7 +4,7 @@ using CategoricalArrays: CategoricalValue, unwrap
 using Random: AbstractRNG, MersenneTwister, randperm, shuffle!
 using JLD2: JLD2
 using StatisticalMeasures: StatisticalMeasures
-using Statistics: mean, median, quantile
+using Statistics: mean, median, quantile, std
 using Tables: Tables
 
 # Struct definitions
@@ -49,6 +49,7 @@ include("api.jl")
 export MichiBoostClassifier, MichiBoostRegressor
 export AutoClassWeights, BoostingTypes, Losses, LossFunction, Metrics, PredictionTypes
 export Expectile, Huber, LogLinQuantile, MAPE, Quantile, Tweedie
+export MultiClassOneVsAll, RMSEWithUncertainty
 export Pool
 export cv
 export eval_metrics

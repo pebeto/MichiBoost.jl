@@ -59,17 +59,16 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
     raw_loss = get(p, :loss_function, default_loss)
     resolved_loss = if raw_loss isa LossFunction
         tt = task_type(raw_loss)
-        if tt === :regression
-            m isa MichiBoostRegressor || error(
-                "Custom regression `LossFunction` requires `MichiBoostRegressor`."
-            )
+        if tt === :regression || tt === :multitarget
+            m isa MichiBoostRegressor ||
+                error("Custom $tt `LossFunction` requires `MichiBoostRegressor`.")
         elseif tt === :binary || tt === :multiclass
             m isa MichiBoostClassifier ||
                 error("Custom $tt `LossFunction` requires `MichiBoostClassifier`.")
         else
             error(
                 "task_type(::$(typeof(raw_loss))) returned `$tt`; expected " *
-                "`:regression`, `:binary`, or `:multiclass`.",
+                "`:regression`, `:binary`, `:multiclass`, or `:multitarget`.",
             )
         end
         raw_loss
@@ -396,6 +395,9 @@ function staged_predict(
         # Regression: raw scores are the predictions, except a custom loss may
         # apply a link (e.g. exp for Tweedie / LogLinQuantile).
         cl = m.model.custom_loss
+        cl !== nothing &&
+            task_type(cl) === :multitarget &&
+            error("`staged_predict` is not supported with a `:multitarget` loss.")
         return cl !== nothing ? link_inverse(cl, raw) : raw
     end
 
@@ -405,7 +407,7 @@ function staged_predict(
         if pt == "Probability"
             out = similar(raw)
             @inbounds for it in 1:niter
-                _softmax_matrix!(view(out,:,:,it), view(raw,:,:,it))
+                _softmax_matrix!(view(out, :, :, it), view(raw, :, :, it))
             end
             return out
         end

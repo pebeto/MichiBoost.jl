@@ -63,6 +63,7 @@ instance to `loss_function`.
 | `MAPE()` | Relative error matters more than absolute. Targets must be non-zero. |
 | `Tweedie(p)` | Non-negative, right-skewed targets with a spike at zero (claims, demand). Predicts on a log scale. |
 | `LogLinQuantile(α)` | Quantiles of positive targets that span orders of magnitude. |
+| `RMSEWithUncertainty()` | You want a per-prediction uncertainty estimate, not just a point. Returns mean and standard deviation. |
 
 ```julia
 # 90th-percentile fit for an upper prediction bound.
@@ -78,6 +79,24 @@ fit!(robust, X_train, y_train)
 exponentiates the result, so the values it returns are on the original target
 scale. Each loss is documented in the [Models](@ref) API reference. To write
 your own, see [Custom Loss Functions](@ref).
+
+### Predicting with Uncertainty
+
+`RMSEWithUncertainty` fits a mean and a standard deviation per sample by
+Gaussian likelihood. [`predict`](@ref) returns an `(n_samples, 2)` matrix whose
+columns are the mean and the standard deviation.
+
+```julia
+model = MichiBoostRegressor(; iterations=500, loss_function=RMSEWithUncertainty())
+fit!(model, X_train, y_train)
+
+out = predict(model, X_test)
+means = out[:, 1]
+stds = out[:, 2]
+```
+
+`staged_predict`, `score`, and a custom `eval_metric` do not apply to this loss;
+early stopping falls back to the loss itself.
 
 ## Early Stopping
 
