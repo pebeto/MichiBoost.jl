@@ -95,8 +95,6 @@ end
     end
 end
 
-# --- RMSEWithUncertainty ----------------------------------------------------
-
 # Heteroscedastic fixture: noise scale grows with |X[:,1]|.
 function _uncertainty_fixture(; n=600, seed=0)
     Random.seed!(seed)

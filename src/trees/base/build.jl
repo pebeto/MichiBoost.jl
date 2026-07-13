@@ -18,6 +18,7 @@ function build_symmetric_tree(
     leaf_refine_values::Union{Nothing,AbstractVector{Float64}}=nothing,
     leaf_refine_weights::Union{Nothing,AbstractVector{Float64}}=nothing,
     leaf_reduce::Union{Nothing,Function}=nothing,
+    monotone::Union{Nothing,Vector{Int}}=nothing,
 )
     n_features = n_num + n_cat
     n_sampled = max(1, round(Int, rsm * n_features))
@@ -28,6 +29,15 @@ function build_symmetric_tree(
     leaf_groups = [view(buffers[1].indices, 1:n)]
 
     reset_hist_cache!(hist_cache)
+
+    # Per-node value bounds for monotonicity. Each split on a constrained
+    # feature narrows the children's bounds around a midpoint so the whole left
+    # subtree stays below the whole right subtree (or above, for a -1 sign).
+    # Final leaf values are clamped into these bounds, which guarantees the tree
+    # is monotone in the constrained feature. See `_propagate_monotone_bounds`.
+    use_mono = monotone !== nothing
+    lo = use_mono ? Float64[-Inf] : Float64[]
+    hi = use_mono ? Float64[Inf] : Float64[]
 
     for _ in 1:depth
         sampled = randperm(rng, n_features)[1:n_sampled]
@@ -49,6 +59,7 @@ function build_symmetric_tree(
             l2_leaf_reg,
             min_data_in_leaf,
         )
+        parent_lo, parent_hi = lo, hi
         leaf_groups = _apply_split!(
             split_features,
             split_types,
@@ -61,6 +72,18 @@ function build_symmetric_tree(
             buffers[1],
         )
         rotate_hist_cache!(hist_cache)
+        if use_mono
+            lo, hi = _propagate_monotone_bounds(
+                parent_lo,
+                parent_hi,
+                leaf_groups,
+                best,
+                monotone,
+                gradients,
+                hessians,
+                l2_leaf_reg,
+            )
+        end
     end
 
     n_leaves = 1 << depth
@@ -71,17 +94,60 @@ function build_symmetric_tree(
     # per-leaf to keep that safety without a per-thread scratch pool.
     Threads.@threads :static for l in 1:n_leaves
         group = leaf_groups[l]
-        if isempty(group)
-            leaf_values[l] = 0.0
+        v = if isempty(group)
+            0.0
         elseif refine
-            leaf_values[l] = _leaf_value_refine(
-                group, leaf_refine_values, leaf_refine_weights, leaf_reduce
-            )
+            _leaf_value_refine(group, leaf_refine_values, leaf_refine_weights, leaf_reduce)
         else
-            leaf_values[l] = _leaf_value_newton(group, gradients, hessians, l2_leaf_reg)
+            _leaf_value_newton(group, gradients, hessians, l2_leaf_reg)
         end
+        leaf_values[l] = use_mono ? clamp(v, lo[l], hi[l]) : v
     end
     return SymmetricTree(depth, split_features, split_types, split_thresholds, leaf_values)
+end
+
+# Narrow each child node's value bounds so a monotone split keeps the left
+# subtree below the right (sign +1) or above it (sign -1). `best.feature_index`
+# is the numerical-block index, matching the `monotone` vector; categorical and
+# degenerate (feature 0) splits pass the parent bounds through unchanged.
+function _propagate_monotone_bounds(
+    lo, hi, leaf_groups, best::SplitCandidate, monotone, gradients, hessians, l2_leaf_reg
+)
+    n_parents = length(lo)
+    new_lo = Vector{Float64}(undef, 2 * n_parents)
+    new_hi = Vector{Float64}(undef, 2 * n_parents)
+    sign =
+        (best.feature_index != 0 && !best.is_categorical) ? monotone[best.feature_index] : 0
+    @inbounds for p in 1:n_parents
+        plo, phi = lo[p], hi[p]
+        if sign == 0
+            new_lo[2p - 1] = plo
+            new_hi[2p - 1] = phi
+            new_lo[2p] = plo
+            new_hi[2p] = phi
+        else
+            left, right = leaf_groups[2p - 1], leaf_groups[2p]
+            vl = if isempty(left)
+                0.0
+            else
+                _leaf_value_newton(left, gradients, hessians, l2_leaf_reg)
+            end
+            vr = if isempty(right)
+                0.0
+            else
+                _leaf_value_newton(right, gradients, hessians, l2_leaf_reg)
+            end
+            mid = 0.5 * (clamp(vl, plo, phi) + clamp(vr, plo, phi))
+            if sign > 0
+                new_lo[2p - 1], new_hi[2p - 1] = plo, mid
+                new_lo[2p], new_hi[2p] = mid, phi
+            else
+                new_lo[2p - 1], new_hi[2p - 1] = mid, phi
+                new_lo[2p], new_hi[2p] = plo, mid
+            end
+        end
+    end
+    return new_lo, new_hi
 end
 
 # Function-barrier helpers: keep g_sum / h_sum as plain locals rather than

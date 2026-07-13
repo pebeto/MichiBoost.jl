@@ -17,6 +17,7 @@ function train(
     init_model::Union{MichiBoostModel,Nothing}=nothing,
     snapshot_path::Union{AbstractString,Nothing}=nothing,
     snapshot_interval::Int=100,
+    monotone_constraints=nothing,
     kwargs...,
 )
     if snapshot_path !== nothing && snapshot_interval < 1
@@ -228,6 +229,18 @@ function train(
     refine_ws = use_refine ? Vector{Float64}(undef, n_samples) : Float64[]
     leaf_reduce = use_refine ? ((v, w) -> leaf_refine_value(lf, v, w)) : nothing
 
+    monotone = _resolve_monotone(monotone_constraints, pool, n_num)
+    if monotone !== nothing
+        is_multiclass && error(
+            "`monotone_constraints` are only supported for regression and binary " *
+            "classification, not multiclass or multitarget losses.",
+        )
+        use_refine && error(
+            "`monotone_constraints` are not supported with $(typeof(lf)); its leaf " *
+            "values come from a quantile refinement, not the Newton step.",
+        )
+    end
+
     for iter in 1:iterations
         if is_multiclass
             gradient_hessian!(grads_buf, hess_buf, lf, mc_target, predictions, scratch_buf)
@@ -287,6 +300,7 @@ function train(
                 leaf_refine_values=use_refine ? refine_vals : nothing,
                 leaf_refine_weights=use_refine ? refine_ws : nothing,
                 leaf_reduce,
+                monotone,
             )
             push!(trees, tree)
             predict_tree!(
@@ -488,6 +502,58 @@ function _resolve_task(loss_function, label, original_class_labels, n_samples::I
         y_onehot,
         class_labels_final,
     )
+end
+
+# Resolve `monotone_constraints` to a length-`n_num` sign vector indexed by the
+# numerical-feature block (matching `SplitCandidate.feature_index`). Accepts a
+# `Dict` keyed by feature name or 1-based column index, or a length-`n_features`
+# vector in column order. Returns `nothing` when no constraint is active.
+function _resolve_monotone(constraints, pool::Pool, n_num::Int)
+    constraints === nothing && return nothing
+    mono = zeros(Int, n_num)
+    col_to_numpos = Dict(pool.numerical_feature_indices[j] => j for j in 1:n_num)
+    name_to_col = Dict(pool.feature_names[c] => c for c in 1:(pool.n_features))
+
+    function set_sign!(feat, s)
+        s in (-1, 0, 1) || error("monotone constraint sign must be -1, 0, or 1; got $s")
+        col = if feat isa Integer
+            Int(feat)
+        elseif feat isa Symbol
+            get(name_to_col, feat) do
+                error("unknown feature in monotone_constraints: :$feat")
+            end
+        elseif feat isa AbstractString
+            get(name_to_col, Symbol(feat)) do
+                error("unknown feature in monotone_constraints: \"$feat\"")
+            end
+        else
+            error("monotone_constraints keys must be feature names or column indices")
+        end
+        haskey(col_to_numpos, col) || error(
+            "monotone_constraints can only target numerical features; column $col " *
+            "is categorical or out of range.",
+        )
+        return mono[col_to_numpos[col]] = s
+    end
+
+    if constraints isa AbstractDict
+        for (feat, s) in constraints
+            set_sign!(feat, Int(s))
+        end
+    elseif constraints isa AbstractVector
+        length(constraints) == pool.n_features || error(
+            "monotone_constraints vector must have length n_features = " *
+            "$(pool.n_features); got $(length(constraints)).",
+        )
+        for c in 1:(pool.n_features)
+            s = Int(constraints[c])
+            s == 0 || set_sign!(c, s)
+        end
+    else
+        error("monotone_constraints must be a Dict or a Vector of signs")
+    end
+
+    return all(==(0), mono) ? nothing : mono
 end
 
 # Allocate the per-iteration gradient / hessian / scratch buffers. Multiclass

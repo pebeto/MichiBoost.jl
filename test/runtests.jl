@@ -19,6 +19,7 @@ end
     include("training/custom_loss.jl")
     include("training/loss_functions.jl")
     include("training/multioutput_loss.jl")
+    include("training/monotone.jl")
     include("training/init_model.jl")
     include("training/snapshot.jl")
 end

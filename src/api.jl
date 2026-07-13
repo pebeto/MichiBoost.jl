@@ -148,6 +148,7 @@ function fit!(m::MichiBoostWrapper, pool::Pool; eval_set=nothing, kwargs...)
             v === nothing ? nothing : String(v)
         end,
         snapshot_interval=Int(get(p, :snapshot_interval, 100)),
+        monotone_constraints=get(p, :monotone_constraints, nothing),
     )
     return m
 end

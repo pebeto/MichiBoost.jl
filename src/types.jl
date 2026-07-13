@@ -478,6 +478,12 @@ After training, the fitted [`MichiBoostModel`](@ref) is accessible via the
   `init_model`.
 - `snapshot_interval::Int=100`: iterations between snapshot writes. Must be
   `>= 1` when `snapshot_path` is set.
+- `monotone_constraints=nothing`: enforce a monotone relationship between a
+  numerical feature and the prediction. Pass a `Dict` keyed by feature name or
+  1-based column index (`Dict(:price => 1, :age => -1)`), or a length-`n_features`
+  vector of signs in column order. `+1` forces the prediction non-decreasing in
+  that feature, `-1` non-increasing, `0` leaves it free. Regression and binary
+  classification only.
 
 Tag-valued keywords (`loss_function`, `boosting_type`, `eval_metric`) accept
 their value as the tag (e.g. `Losses.RMSE`), the matching string (`"RMSE"`),

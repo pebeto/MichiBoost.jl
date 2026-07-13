@@ -156,6 +156,39 @@ for (feature, score) in importance
 end
 ```
 
+## Monotonicity Constraints
+
+Force the prediction to move only one way in a feature. Pass
+`monotone_constraints` as a `Dict` keyed by feature name or 1-based column
+index, with `+1` for non-decreasing, `-1` for non-increasing, and `0` for
+unconstrained.
+
+```julia
+model = MichiBoostRegressor(;
+    iterations=500,
+    monotone_constraints=Dict(:price => +1, :age => -1),
+)
+fit!(model, X_train, y_train)
+```
+
+A length-`n_features` vector of signs in column order works too:
+
+```julia
+# +1 on column 1, -1 on column 2, the rest free.
+MichiBoostRegressor(; monotone_constraints=[1, -1, 0, 0])
+```
+
+The constraint is a hard guarantee: for any two inputs that differ only in a
+`+1` feature, the one with the larger feature value gets a prediction that is
+greater than or equal to the other's. MichiBoost enforces it by bounding leaf
+values during tree construction, so it holds for every tree and therefore the
+whole ensemble. Guaranteeing monotonicity separates the affected subtrees, which
+costs a little accuracy compared with an unconstrained fit.
+
+Constraints apply to numerical features in regression and binary classification.
+Passing them with a categorical feature, a multi-class or multi-target loss, or
+a refinement loss (MAE, the quantile family) raises an error.
+
 ## Model Persistence
 
 Trained models can be serialized to disk and reloaded later. Serialization uses
